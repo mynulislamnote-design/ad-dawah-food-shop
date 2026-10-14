@@ -1,0 +1,57 @@
+{
+  "users": {
+    "mynulislamnote@gmail.com": {
+      "id": "usr_1791468409898",
+      "email": "mynulislamnote@gmail.com",
+      "name": "আব্দুল্লাহিল কাফি ",
+      "phone": "01788592937",
+      "messName": "আদ দাওাহ মেস ",
+      "roomNo": "69",
+      "walletBalance": 500
+    },
+    "addawahlearningsupport@gmail.com": {
+      "id": "usr_1791713263860",
+      "email": "addawahlearningsupport@gmail.com",
+      "name": "Ad Dawah Learning Support",
+      "phone": "01736738334",
+      "messName": "টেস্ট ",
+      "roomNo": "555",
+      "walletBalance": 0
+    },
+    "addawahresearchinstitute@gmail.com": {
+      "id": "usr_1791719285118",
+      "email": "addawahresearchinstitute@gmail.com",
+      "name": "Tareq Munawar",
+      "phone": "01736738334",
+      "messName": "আদ দাওয়াহ মেস",
+      "roomNo": "201",
+      "walletBalance": 0
+    },
+    "mynulislam200@gmail.com": {
+      "id": "usr_1791722580737",
+      "email": "mynulislam200@gmail.com",
+      "name": "mynul islam",
+      "phone": "01722455525",
+      "messName": "আম চত্বর ",
+      "roomNo": "69",
+      "walletBalance": 0
+    }
+  },
+  "walletRequests": [
+    {
+      "id": "wreq_1791468395413",
+      "email": "mynulislamnote@gmail.com",
+      "customerName": "Mynulislam Note",
+      "customerPhone": "N/A",
+      "amount": 500,
+      "paymentMethod": "BKASH",
+      "trxId": "DDD",
+      "status": "APPROVED",
+      "createdAt": "2026-10-08T14:06:35.413Z",
+      "user": {
+        "email": "mynulislamnote@gmail.com",
+        "walletBalance": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String          @id @default(uuid())
+  email         String          @unique
+  name          String
+  phone         String?
+  messName      String?
+  roomNo        String?
+  walletBalance Float           @default(0.0)
+  createdAt     DateTime        @default(now())
+  walletRequests WalletRequest[]
+}
+
+model WalletRequest {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  customerName  String
+  customerPhone String
+  amount        Float
+  paymentMethod String   // BKASH, NAGAD
+  trxId         String
+  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt     DateTime @default(now())
+}
+
+model MenuItem {
+  id          String   @id @default(uuid())
+  nameBn      String
+  mealSlot    String
+  price       Float
+  isAvailable Boolean  @default(true)
+}
+
+model DailyOrder {
+  id             String   @id @default(uuid())
+  customerName   String
+  customerPhone  String
+  messName       String
+  roomNo         String
+  targetDate     String
+  mealSlot       String
+  packageType    String
+  deliveryType   String
+  deliveryCharge Float    @default(0.0)
+  totalAmount    Float
+  paymentMethod  String
+  isSkipped      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+}
