@@ -148,22 +148,18 @@ export default function MealOrderApp() {
     "7DAYS" | "15DAYS" | "30DAYS" | "CUSTOM"
   >("CUSTOM");
 
-  // বেলার ডিফল্ট পছন্দ (সাপ্তাহিক/মাসিক প্যাকেজের জন্য)
   const [subscribedSlots, setSubscribedSlots] = useState({
     breakfast: true,
     lunch: true,
     dinner: true,
   });
 
-  // কুইক প্রিসেট বাটন হ্যান্ডলার (৭ দিন, ১৫ দিন, ৩০ দিন ১-ক্লিকে সিলেক্ট)
   const applyQuickPreset = (
     daysCount: number,
     presetType: "7DAYS" | "15DAYS" | "30DAYS",
   ) => {
     setQuickPreset(presetType);
     const newMap: { [dateStr: string]: DaySlotConfig } = {};
-
-    // বর্তমান মাস বা আগামী দিনগুলো থেকে ধারাবাহিক দিন নেওয়া
     const allAvailable = availableMonths.flatMap((m) =>
       getDaysForMonth(m.year, m.monthIndex),
     );
@@ -184,7 +180,6 @@ export default function MealOrderApp() {
     setSelectedDatesMap(newMap);
   };
 
-  // সাবস্ক্রাইবড স্লট পরিবর্তন করলে কুইক প্রিসেটের দিনগুলোতেও তা আপডেট হবে
   useEffect(() => {
     if (quickPreset !== "CUSTOM") {
       const count =
@@ -193,7 +188,6 @@ export default function MealOrderApp() {
     }
   }, [subscribedSlots]);
 
-  // ডিফল্টভাবে প্রথম দিনটি সিলেক্ট করে রাখা
   useEffect(() => {
     if (
       currentMonthDays.length > 0 &&
@@ -217,6 +211,12 @@ export default function MealOrderApp() {
   const [selectedPackage, setSelectedPackage] = useState<"REGULAR" | "CUSTOM">(
     "REGULAR",
   );
+  const [selectedSlot, setSelectedSlot] = useState<
+    "BREAKFAST" | "LUNCH" | "DINNER"
+  >("LUNCH");
+  const [breakfastChoice, setBreakfastChoice] = useState<
+    "KHICHURI" | "PARATHA"
+  >("KHICHURI");
 
   // ডেলিভারি ও সেটিংস
   const [deliveryMethod, setDeliveryMethod] = useState<
@@ -234,7 +234,7 @@ export default function MealOrderApp() {
     { id: "ex5", name: "শসা ও লেবুর ফ্রেশ সালাদ", price: 10, count: 0 },
   ]);
 
-  // কাস্টম প্লেটের খাবার
+  // কাস্টম প্লেটের প্রিমিয়াম খাবার (ছবি ও ব্যাজসহ)
   const [customItems, setCustomItems] = useState([
     {
       id: "c1",
@@ -285,6 +285,10 @@ export default function MealOrderApp() {
       badge: "ঘি ভাজা",
     },
   ]);
+
+  const [regularMenuOverrides, setRegularMenuOverrides] = useState<{
+    [key: string]: { name: string; price: number };
+  }>({});
 
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"BKASH" | "WALLET">(
@@ -366,6 +370,19 @@ export default function MealOrderApp() {
               })),
             );
           }
+
+          const regOverrides: {
+            [key: string]: { name: string; price: number };
+          } = {};
+          data.forEach((item: any) => {
+            if (item.mealSlot.startsWith("REGULAR_")) {
+              regOverrides[item.mealSlot] = {
+                name: item.nameBn,
+                price: item.price,
+              };
+            }
+          });
+          setRegularMenuOverrides(regOverrides);
         }
       })
       .catch((err) => console.error(err));
@@ -377,6 +394,90 @@ export default function MealOrderApp() {
       : isFreeDeliveryPromo
         ? 0
         : adminDeliveryCharge;
+
+  // ৩-দিনের সাইকেল হিসাব
+  const selectedDay = currentMonthDays[0] || {
+    isFriday: false,
+    rawDate: new Date(),
+  };
+  const cycleIndex =
+    Math.abs(Math.floor(new Date().getTime() / (1000 * 60 * 60 * 24))) % 3;
+
+  const lunchCycle = [
+    {
+      title:
+        regularMenuOverrides["REGULAR_LUNCH_DAY1"]?.name ||
+        "১ম দিন: ডিম ভুনা + ঘন ডাল + আলু ভর্তা + ভাত",
+      price: regularMenuOverrides["REGULAR_LUNCH_DAY1"]?.price || 70,
+      img: "https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=600&q=80",
+      desc: "গরম ধোঁয়া ওঠা বাসমতি চালের ভাত ও ডিম ভুনা।",
+    },
+    {
+      title:
+        regularMenuOverrides["REGULAR_LUNCH_DAY2"]?.name ||
+        "২য় দিন: রুই মাছের ঝোল + সবজি + ডাল + ভাত",
+      price: regularMenuOverrides["REGULAR_LUNCH_DAY2"]?.price || 80,
+      img: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80",
+      desc: "তাজা বড় রুই মাছের জিরা বাটা ঝোল।",
+    },
+    {
+      title:
+        regularMenuOverrides["REGULAR_LUNCH_DAY3"]?.name ||
+        "৩য় দিন: দেশি মুরগির ঝোল + সবজি + ডাল + ভাত",
+      price: regularMenuOverrides["REGULAR_LUNCH_DAY3"]?.price || 90,
+      img: "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=600&q=80",
+      desc: "দেশি মুরগির মাংসের তরকারি ও ঘন ডাল।",
+    },
+  ];
+
+  const fridayLunch = {
+    title:
+      regularMenuOverrides["REGULAR_FRIDAY"]?.name ||
+      "শুক্রবার স্পেশাল: শাহী বিফ দম বিরিয়ানি + বোরহানি",
+    price: regularMenuOverrides["REGULAR_FRIDAY"]?.price || 130,
+    img: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600&q=80",
+    desc: "গাওয়া ঘিয়ে রান্না বিফ দম বিরিয়ানি ও বোরহানি।",
+  };
+
+  const breakfastOptions = {
+    KHICHURI: {
+      title:
+        regularMenuOverrides["REGULAR_BREAKFAST_KHICHURI"]?.name ||
+        "ভুনা খিচুড়ি + ডিম ভুনা/ভাজি",
+      price: regularMenuOverrides["REGULAR_BREAKFAST_KHICHURI"]?.price || 45,
+      img: "https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=600&q=80",
+      desc: "মুগ ও মসুর ডালে রান্না ঝরঝরে খিচুড়ি।",
+    },
+    PARATHA: {
+      title:
+        regularMenuOverrides["REGULAR_BREAKFAST_PARATHA"]?.name ||
+        "গরম পরোটা (৩টি) + ডিম ভাজি + ডাল-ভাজি",
+      price: regularMenuOverrides["REGULAR_BREAKFAST_PARATHA"]?.price || 40,
+      img: "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=600&q=80",
+      desc: "মুচমুচে গরম পরোটা ও ডিম ভাজি।",
+    },
+  };
+
+  const dinnerData = {
+    title:
+      cycleIndex % 2 === 0
+        ? regularMenuOverrides["REGULAR_DINNER_1"]?.name ||
+          "রাতের স্পেশাল ভুনা খিচুড়ি + বেগুন ও ডিম ভাজি"
+        : regularMenuOverrides["REGULAR_DINNER_2"]?.name ||
+          "রাতের ভাত + ডিম ভুনা + স্পেশাল ভর্তা + ডাল",
+    price: regularMenuOverrides["REGULAR_DINNER_1"]?.price || 65,
+    img: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80",
+    desc: "হালকা ও পুষ্টিকর সুষম রাতের খাবার।",
+  };
+
+  let currentRegularMenu = lunchCycle[cycleIndex];
+  if (selectedSlot === "BREAKFAST") {
+    currentRegularMenu = breakfastOptions[breakfastChoice];
+  } else if (selectedSlot === "LUNCH") {
+    currentRegularMenu = lunchCycle[cycleIndex];
+  } else {
+    currentRegularMenu = dinnerData;
+  }
 
   // তারিখ টগল করা
   const toggleDateSelection = (dayObj: any) => {
@@ -430,10 +531,6 @@ export default function MealOrderApp() {
 
   const totalMealSlotsCount = totalBreakfasts + totalLunches + totalDinners;
 
-  const breakfastRate = 40;
-  const lunchRate = 80;
-  const dinnerRate = 60;
-
   const extraItemsTotal = extraItems.reduce(
     (acc, item) => acc + item.price * item.count,
     0,
@@ -447,10 +544,9 @@ export default function MealOrderApp() {
 
   if (selectedPackage === "REGULAR") {
     const regularMealsCost =
-      totalBreakfasts * breakfastRate +
-      totalLunches * lunchRate +
-      totalDinners * dinnerRate;
-    // ৭ দিন বা ৩০ দিনের বড় প্যাকেজে ছোট্ট ডিসকাউন্ট
+      totalBreakfasts * breakfastOptions.PARATHA.price +
+      totalLunches * 80 +
+      totalDinners * 60;
     let discount = 0;
     if (quickPreset === "7DAYS") discount = 60;
     if (quickPreset === "15DAYS") discount = 150;
@@ -458,7 +554,7 @@ export default function MealOrderApp() {
 
     calculatedMealTotal =
       Math.max(0, regularMealsCost - discount) + extraItemsTotal;
-    packageSummaryTitle = `${quickPreset === "7DAYS" ? "১ সপ্তাহ প্যাকেজ" : quickPreset === "15DAYS" ? "১৫ দিনের প্যাকেজ" : quickPreset === "30DAYS" ? "১ মাস প্যাকেজ" : "কাস্টম ডেট-রেঞ্জ"} (${selectedDatesList.length} দিন, মোট ${totalMealSlotsCount} বেলা)`;
+    packageSummaryTitle = `${quickPreset === "7DAYS" ? "১ সপ্তাহ প্যাকেজ" : quickPreset === "15DAYS" ? "১৫ দিনের প্যাকেজ" : quickPreset === "30DAYS" ? "১ মাস প্যাকেজ সপ্তাহ" : "কাস্টম ডেট-রেঞ্জ"} (${selectedDatesList.length} দিন, মোট ${totalMealSlotsCount} বেলা)`;
   } else {
     calculatedMealTotal =
       customItemsTotal * totalMealSlotsCount + extraItemsTotal;
@@ -546,7 +642,6 @@ export default function MealOrderApp() {
     }
   };
 
-  // ফাইনাল অর্ডার সাবমিট (প্রতিটি দিনের জন্য আলাদা শিডিউল তৈরি)
   const handleOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customerName || !customerPhone) {
@@ -681,6 +776,7 @@ export default function MealOrderApp() {
                   type="button"
                   onClick={() => signOut()}
                   className="w-7 h-7 rounded-full bg-emerald-900/85 border border-emerald-600 flex items-center justify-center text-emerald-200 hover:text-white"
+                  title="লগআউট"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                 </button>
@@ -728,6 +824,32 @@ export default function MealOrderApp() {
             </div>
           </div>
         )}
+
+        {/* ভিডিও টিউটোরিয়াল বাটন */}
+        <div
+          onClick={() => setIsVideoModalOpen(true)}
+          className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 rounded-2xl p-3 shadow-md flex items-center justify-between text-white cursor-pointer hover:shadow-lg transition-all active:scale-[0.99] border border-amber-300/40"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-white/25 backdrop-blur-md flex items-center justify-center shadow-inner animate-pulse">
+              <Play className="w-5 h-5 fill-white text-white ml-0.5" />
+            </div>
+            <div>
+              <span className="text-[9px] font-black uppercase tracking-wider bg-black/25 px-2 py-0.5 rounded-full inline-block">
+                ভিডিও গাইডলাইন
+              </span>
+              <h4 className="text-xs font-black mt-0.5 leading-tight">
+                কীভাবে খাবার অর্ডার ও মিল ক্যানসেল করবেন?
+              </h4>
+              <p className="text-[10px] text-amber-100">
+                অর্ডার প্রক্রিয়ার বিস্তারিত ভিডিও টিউটোরিয়াল দেখুন
+              </p>
+            </div>
+          </div>
+          <span className="text-[11px] font-extrabold bg-white text-amber-900 px-3 py-1.5 rounded-xl shadow-sm shrink-0">
+            ভিডিও দেখুন
+          </span>
+        </div>
 
         {/* প্যাকেজ সিলেকশন */}
         <div className="grid grid-cols-2 gap-3">
@@ -780,7 +902,99 @@ export default function MealOrderApp() {
           </button>
         </div>
 
-        {/* নতুন চাহিদা: উপরে ১-ক্লিক ৩টি অপশন (৭ দিন, ১৫ দিন, ৩০ দিন) */}
+        {/* রেগুলার প্যাকেজ হলে রুটিন ফুড কার্ড শো করবে */}
+        {selectedPackage === "REGULAR" ? (
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="relative h-44 w-full">
+              <img
+                src={currentRegularMenu.img}
+                alt={currentRegularMenu.title}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent"></div>
+              <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between">
+                <div>
+                  <span className="text-amber-300 text-[10px] font-bold flex items-center gap-1">
+                    <Star className="w-3 h-3 fill-amber-300 text-amber-300" />{" "}
+                    ৪.৯ সুষম সাইকেল রুটিন
+                  </span>
+                  <h3 className="text-white font-extrabold text-base leading-tight mt-0.5">
+                    {currentRegularMenu.title}
+                  </h3>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="text-xl font-black text-amber-300">
+                    ৳{currentRegularMenu.price}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3.5 text-xs text-slate-600 leading-relaxed">
+              {currentRegularMenu.desc}
+            </div>
+          </div>
+        ) : (
+          /* কাস্টম প্লেট গ্রিড ভিউ (ছবি ও ব্যাজসহ) */
+          <div className="space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-xs font-bold text-slate-700">
+                খাবার পছন্দ করে নিজের প্লেট সাজান:
+              </h3>
+              <span className="text-[11px] font-bold text-emerald-700">
+                প্লেটের মোট: ৳{customItemsTotal}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {customItems.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => toggleCustomItem(item.id)}
+                  className={`bg-white rounded-2xl border p-2.5 cursor-pointer transition-all flex flex-col justify-between ${
+                    item.selected
+                      ? "border-emerald-600 ring-2 ring-emerald-500/20 shadow-md bg-emerald-50/20"
+                      : "border-slate-200 hover:border-slate-300 shadow-sm"
+                  }`}
+                >
+                  <div className="relative h-24 w-full rounded-xl overflow-hidden mb-2">
+                    <img
+                      src={item.img}
+                      alt={item.name}
+                      className="w-full h-full object-cover"
+                    />
+                    <span className="absolute top-1.5 left-1.5 bg-black/60 backdrop-blur-md text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                      {item.badge}
+                    </span>
+                    {item.selected && (
+                      <div className="absolute top-1.5 right-1.5 bg-emerald-600 text-white rounded-full p-1 shadow">
+                        <Check className="w-3 h-3 stroke-[3]" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <h4 className="font-bold text-xs text-slate-800 line-clamp-1">
+                      {item.name}
+                    </h4>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-xs font-black text-emerald-800">
+                        ৳{item.price}
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${item.selected ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600"}`}
+                      >
+                        {item.selected ? "সিলেক্টেড" : "+ যোগ"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* নতুন চাহিদা: ৭, ১৫, ৩০ দিন ১-ক্লিক প্রিসেট */}
         <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-3xl p-3.5 space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-extrabold text-emerald-950 flex items-center gap-1.5">
@@ -833,69 +1047,6 @@ export default function MealOrderApp() {
               📅 ৩০ দিন
             </button>
           </div>
-
-          {/* এই ৭, ১৫ বা ৩০ দিনের ভেতরে কোন কোন বেলা খাবে তার গ্লোবাল টগল */}
-          <div className="pt-2 border-t border-emerald-200/60 space-y-1.5">
-            <span className="text-[11px] font-bold text-emerald-900 block">
-              এই প্যাকেজে কোন বেলাগুলো নিতে চান:
-            </span>
-            <div className="grid grid-cols-3 gap-1.5">
-              <button
-                type="button"
-                onClick={() =>
-                  setSubscribedSlots((p) => ({ ...p, breakfast: !p.breakfast }))
-                }
-                className={`py-1.5 px-2 rounded-lg border text-[11px] font-bold flex items-center justify-center gap-1 ${
-                  subscribedSlots.breakfast
-                    ? "bg-emerald-600 text-white border-emerald-600"
-                    : "bg-white text-slate-500 border-slate-200"
-                }`}
-              >
-                {subscribedSlots.breakfast ? (
-                  <CheckSquare className="w-3 h-3" />
-                ) : (
-                  <Square className="w-3 h-3" />
-                )}{" "}
-                সকাল
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setSubscribedSlots((p) => ({ ...p, lunch: !p.lunch }))
-                }
-                className={`py-1.5 px-2 rounded-lg border text-[11px] font-bold flex items-center justify-center gap-1 ${
-                  subscribedSlots.lunch
-                    ? "bg-emerald-600 text-white border-emerald-600"
-                    : "bg-white text-slate-500 border-slate-200"
-                }`}
-              >
-                {subscribedSlots.lunch ? (
-                  <CheckSquare className="w-3 h-3" />
-                ) : (
-                  <Square className="w-3 h-3" />
-                )}{" "}
-                দুপুর
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setSubscribedSlots((p) => ({ ...p, dinner: !p.dinner }))
-                }
-                className={`py-1.5 px-2 rounded-lg border text-[11px] font-bold flex items-center justify-center gap-1 ${
-                  subscribedSlots.dinner
-                    ? "bg-emerald-600 text-white border-emerald-600"
-                    : "bg-white text-slate-500 border-slate-200"
-                }`}
-              >
-                {subscribedSlots.dinner ? (
-                  <CheckSquare className="w-3 h-3" />
-                ) : (
-                  <Square className="w-3 h-3" />
-                )}{" "}
-                রাত
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* ক্যালেন্ডার ও পার-ডে স্লট কাস্টমাইজার */}
@@ -903,7 +1054,7 @@ export default function MealOrderApp() {
           <div className="flex items-center justify-between border-b pb-2">
             <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
               <CalendarDays className="w-4 h-4 text-emerald-600" />
-              অথবা নিজে ইচ্ছেমতো তারিখ ও বার সিলেক্ট করুন:
+              তারিখ সিলেক্ট করুন (একাধিক দিন বেছে নিতে পারেন):
             </span>
             <div className="relative">
               <select
@@ -973,7 +1124,7 @@ export default function MealOrderApp() {
           {selectedDatesList.length > 0 && (
             <div className="border-t pt-3 space-y-2.5 animate-in fade-in">
               <span className="text-xs font-extrabold text-emerald-950 block">
-                নির্বাচিত দিনগুলোর বেলা কাস্টমাইজ করুন:
+                নির্বাচিত দিনগুলোর বেলা কাস্টমাইজ করুন (কোন দিন কোন বেলা খাবেন):
               </span>
 
               <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
@@ -1047,7 +1198,7 @@ export default function MealOrderApp() {
                 খাবার যোগ করুন (ঐচ্ছিক):
               </h3>
               <p className="text-[10px] text-slate-400 mt-0.5">
-                এক্সট্রা প্রয়োজন হলে প্লেটে যোগ করুন
+                প্রতিদিনের জন্য এক্সট্রা আইটেম
               </p>
             </div>
             {extraItemsTotal > 0 && (
@@ -1185,6 +1336,68 @@ export default function MealOrderApp() {
               </button>
             </div>
 
+            {/* পেমেন্ট পদ্ধতি */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 block">
+                পেমেন্ট মেথড:
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("BKASH")}
+                  className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all ${
+                    paymentMethod === "BKASH"
+                      ? "border-pink-600 bg-pink-50 text-pink-900 font-bold"
+                      : "border-slate-200"
+                  }`}
+                >
+                  <CreditCard className="w-4 h-4 text-pink-600" />
+                  <span className="text-xs">বিকাশ / নগদ</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("WALLET")}
+                  className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all ${
+                    paymentMethod === "WALLET"
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-900 font-bold"
+                      : "border-slate-200"
+                  }`}
+                >
+                  <Wallet className="w-4 h-4 text-emerald-600" />
+                  <span className="text-xs">ওয়ালেট (৳{userWallet})</span>
+                </button>
+              </div>
+
+              {paymentMethod === "BKASH" && (
+                <div className="bg-pink-50/70 p-3 rounded-2xl border border-pink-200 space-y-2 mt-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-600 font-medium">
+                      Send Money নাম্বার:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={copyBkashNumber}
+                      className="font-mono font-bold text-pink-700 bg-pink-100 px-2 py-0.5 rounded-lg flex items-center gap-1"
+                    >
+                      {shopBkashNumber}
+                      {copiedNumber ? (
+                        <Check className="w-3 h-3 text-emerald-600" />
+                      ) : (
+                        <Copy className="w-3 h-3" />
+                      )}
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="বিকাশ TrxID লিখুন"
+                    value={trxId}
+                    onChange={(e) => setTrxId(e.target.value.toUpperCase())}
+                    className="w-full text-xs font-mono p-2.5 rounded-xl border border-pink-300 uppercase tracking-wider"
+                  />
+                </div>
+              )}
+            </div>
+
             <form onSubmit={handleOrderSubmit} className="space-y-3">
               <div>
                 <label className="text-[10px] font-bold text-slate-500 block mb-0.5">
@@ -1228,7 +1441,7 @@ export default function MealOrderApp() {
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 block mb-0.5">
+                    <label className="text-xs font-bold text-slate-700 block mb-0.5">
                       রুম নম্বর:
                     </label>
                     <input
@@ -1282,6 +1495,37 @@ export default function MealOrderApp() {
                 <span>কনফার্ম প্রি-অর্ডার (৳{grandTotal})</span>
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ভিডিও টিউটোরিয়াল মডাল */}
+      {isVideoModalOpen && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="bg-emerald-800 text-white p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Video className="w-5 h-5 text-amber-300" />
+                <h3 className="font-extrabold text-sm">
+                  অর্ডার করার ভিডিও গাইডলাইন
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsVideoModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="relative pt-[56.25%] bg-black">
+              <iframe
+                className="absolute inset-0 w-full h-full"
+                src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1"
+                title="টিউটোরিয়াল ভিডিও"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              ></iframe>
+            </div>
           </div>
         </div>
       )}
