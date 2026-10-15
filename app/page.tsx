@@ -37,10 +37,6 @@ import {
   LogOut,
   ShieldCheck,
   Calendar,
-  ChevronUp,
-  Sun,
-  Sunset,
-  Moon,
 } from "lucide-react";
 
 const BANGLA_DAYS = ["রবি", "সোম", "মঙ্গল", "বুধ", "বৃহঃ", "শুক্র", "শনি"];
@@ -110,12 +106,6 @@ function getDaysForMonth(year: number, monthIndex: number) {
   return days;
 }
 
-interface ExtraItem {
-  id: string;
-  name: string;
-  price: number;
-}
-
 interface DaySlotConfig {
   date: string;
   dayName: string;
@@ -124,8 +114,8 @@ interface DaySlotConfig {
   breakfast: boolean;
   lunch: boolean;
   dinner: boolean;
-  // নির্দিষ্ট দিনে কী কী অতিরিক্ত খাবার যুক্ত হলো: { [itemId]: count }
-  extras: { [itemId: string]: number };
+  extras: { [slot: string]: { [itemId: string]: number } };
+  [key: string]: any;
 }
 
 export default function MealOrderApp() {
@@ -150,23 +140,13 @@ export default function MealOrderApp() {
     return getDaysForMonth(selectedMonth.year, selectedMonth.monthIndex);
   }, [selectedMonth]);
 
-  // মাল্টি-ডেট সিলেকশন স্টেট
   const [selectedDatesMap, setSelectedDatesMap] = useState<{
     [dateStr: string]: DaySlotConfig;
   }>({});
-
-  // ১-ক্লিক প্রিসেট মোড
   const [quickPreset, setQuickPreset] = useState<
     "7DAYS" | "15DAYS" | "30DAYS" | "CUSTOM"
   >("CUSTOM");
 
-  const [subscribedSlots, setSubscribedSlots] = useState({
-    breakfast: true,
-    lunch: true,
-    dinner: true,
-  });
-
-  // নির্দিষ্ট কোনো দিনের অতিরিক্ত প্যানেল ওপেন রাখার স্টেট
   const [openExtraForDate, setOpenExtraForDate] = useState<string | null>(null);
   const [selectedExtraSlot, setSelectedExtraSlot] = useState<
     "breakfast" | "lunch" | "dinner"
@@ -189,23 +169,15 @@ export default function MealOrderApp() {
         dayName: day.dayName,
         dayNumber: day.dayNumber,
         monthName: day.monthName,
-        breakfast: subscribedSlots.breakfast,
-        lunch: subscribedSlots.lunch,
-        dinner: subscribedSlots.dinner,
+        breakfast: true,
+        lunch: true,
+        dinner: true,
         extras: {},
       };
     });
 
     setSelectedDatesMap(newMap);
   };
-
-  useEffect(() => {
-    if (quickPreset !== "CUSTOM") {
-      const count =
-        quickPreset === "7DAYS" ? 7 : quickPreset === "15DAYS" ? 15 : 30;
-      applyQuickPreset(count, quickPreset);
-    }
-  }, [subscribedSlots]);
 
   useEffect(() => {
     if (
@@ -238,23 +210,21 @@ export default function MealOrderApp() {
     "KHICHURI" | "PARATHA"
   >("KHICHURI");
 
-  // ডেলিভারি ও সেটিংস
   const [deliveryMethod, setDeliveryMethod] = useState<
     "HOME_DELIVERY" | "PICKUP"
   >("HOME_DELIVERY");
   const [adminDeliveryCharge, setAdminDeliveryCharge] = useState(15);
   const [isFreeDeliveryPromo, setIsFreeDeliveryPromo] = useState(false);
 
-  // অতিরিক্ত খাবারের মাস্টার তালিকা (এডমিন থেকে লাইভ সিঙ্ক)
-  const [availableExtraItems, setAvailableExtraItems] = useState<ExtraItem[]>([
-    { id: "ex1", name: "অতিরিক্ত সাদা ভাত", price: 15 },
-    { id: "ex2", name: "ডিম পোচ / ওমলেট", price: 20 },
-    { id: "ex3", name: "স্পেশাল আলু ভর্তা (গাওয়া ঘি)", price: 10 },
-    { id: "ex4", name: "ঘন মসুর ডাল বাটি", price: 15 },
-    { id: "ex5", name: "শসা ও লেবুর ফ্রেশ সালাদ", price: 10 },
+  // অতিরিক্ত খাবার লিস্ট (extraItems)
+  const [extraItems, setExtraItems] = useState([
+    { id: "ex1", name: "অতিরিক্ত সাদা ভাত", price: 15, count: 0 },
+    { id: "ex2", name: "ডিম পোচ / ওমলেট", price: 20, count: 0 },
+    { id: "ex3", name: "স্পেশাল আলু ভর্তা (গাওয়া ঘি)", price: 10, count: 0 },
+    { id: "ex4", name: "ঘন মসুর ডাল বাটি", price: 15, count: 0 },
+    { id: "ex5", name: "শসা ও লেবুর ফ্রেশ সালাদ", price: 10, count: 0 },
   ]);
 
-  // কাস্টম প্লেটের খাবার
   const [customItems, setCustomItems] = useState([
     {
       id: "c1",
@@ -365,11 +335,12 @@ export default function MealOrderApp() {
             (item: any) => item.mealSlot === "EXTRA_ADDON" && item.isAvailable,
           );
           if (extras.length > 0) {
-            setAvailableExtraItems(
+            setExtraItems(
               extras.map((item: any) => ({
                 id: item.id,
                 name: item.nameBn,
                 price: item.price,
+                count: 0,
               })),
             );
           }
@@ -574,12 +545,12 @@ export default function MealOrderApp() {
     if (d.lunch) totalLunches++;
     if (d.dinner) totalDinners++;
 
-    // সব দিনের সব বেলার অতিরিক্ত খাবারের দাম যোগ করা
-    Object.keys(d.extras).forEach((slotKey) => {
-      const slotItems = d.extras[slotKey] || {};
+    const dayExtras = d.extras || {};
+    Object.keys(dayExtras).forEach((slotKey) => {
+      const slotItems = dayExtras[slotKey] || {};
       Object.keys(slotItems).forEach((itemId) => {
         const qty = slotItems[itemId] || 0;
-        const foundItem = availableExtraItems.find((ex) => ex.id === itemId);
+        const foundItem = extraItems.find((ex) => ex.id === itemId);
         if (foundItem) {
           totalExtrasCost += foundItem.price * qty;
         }
@@ -684,7 +655,6 @@ export default function MealOrderApp() {
     }
   };
 
-  // ফাইনাল অর্ডার সাবমিট (প্রতিটি দিনের জন্য আলাদা শিডিউল তৈরি ও অতিরিক্ত খাবার সহ)
   const handleOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customerName || !customerPhone) {
@@ -732,13 +702,12 @@ export default function MealOrderApp() {
           (dayConfig.dinner ? 1 : 0);
         if (dayMealsCount === 0) continue;
 
-        // ঐ দিনের অতিরিক্ত খাবারের সারসংক্ষেপ টেক্সট তৈরি
         const extraSummaryParts: string[] = [];
         ["breakfast", "lunch", "dinner"].forEach((sKey) => {
           const slotExtras = dayConfig.extras[sKey] || {};
           const slotNameBn =
             sKey === "breakfast" ? "সকাল" : sKey === "lunch" ? "দুপুর" : "রাত";
-          const itemsInSlot = availableExtraItems
+          const itemsInSlot = extraItems
             .filter((ex) => (slotExtras[ex.id] || 0) > 0)
             .map((ex) => `${ex.name} (${slotExtras[ex.id]}টি)`);
 
@@ -889,6 +858,32 @@ export default function MealOrderApp() {
             </div>
           </div>
         )}
+
+        {/* ভিডিও টিউটোরিয়াল বাটন */}
+        <div
+          onClick={() => setIsVideoModalOpen(true)}
+          className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 rounded-2xl p-3 shadow-md flex items-center justify-between text-white cursor-pointer hover:shadow-lg transition-all active:scale-[0.99] border border-amber-300/40"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-white/25 backdrop-blur-md flex items-center justify-center shadow-inner animate-pulse">
+              <Play className="w-5 h-5 fill-white text-white ml-0.5" />
+            </div>
+            <div>
+              <span className="text-[9px] font-black uppercase tracking-wider bg-black/25 px-2 py-0.5 rounded-full inline-block">
+                ভিডিও গাইডলাইন
+              </span>
+              <h4 className="text-xs font-black mt-0.5 leading-tight">
+                কীভাবে খাবার অর্ডার ও মিল ক্যানসেল করবেন?
+              </h4>
+              <p className="text-[10px] text-amber-100">
+                অর্ডার প্রক্রিয়ার বিস্তারিত ভিডিও টিউটোরিয়াল দেখুন
+              </p>
+            </div>
+          </div>
+          <span className="text-[11px] font-extrabold bg-white text-amber-900 px-3 py-1.5 rounded-xl shadow-sm shrink-0">
+            ভিডিও দেখুন
+          </span>
+        </div>
 
         {/* প্যাকেজ সিলেকশন */}
         <div className="grid grid-cols-2 gap-3">
@@ -1087,7 +1082,7 @@ export default function MealOrderApp() {
           </div>
         </div>
 
-        {/* ক্যালেন্ডার ও পার-ডে স্লট কাস্টমাইজার (প্রতিটি দিনের কার্ডে অতিরিক্ত খাবার যোগের বাটনসহ) */}
+        {/* ক্যালেন্ডার ও পার-ডে স্লট কাস্টমাইজার (প্রতিটি দিনের কার্ডের ভেতরে অতিরিক্ত খাবার বাটনসহ) */}
         <div className="bg-white p-4 rounded-3xl border border-slate-200/90 shadow-sm space-y-3">
           <div className="flex items-center justify-between border-b pb-2">
             <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -1258,7 +1253,7 @@ export default function MealOrderApp() {
                         {isExtraOpen && (
                           <div className="bg-white p-2.5 rounded-xl border border-slate-200 space-y-2 mt-2 animate-in fade-in">
                             <div className="divide-y divide-slate-100">
-                              {availableExtraItems.map((ex) => {
+                              {extraItems.map((ex) => {
                                 const slotExtras =
                                   dConfig.extras[selectedExtraSlot] || {};
                                 const count = slotExtras[ex.id] || 0;
@@ -1304,7 +1299,7 @@ export default function MealOrderApp() {
                                           }
                                           className={`px-1.5 py-0.5 rounded ${selectedExtraSlot === "dinner" ? "bg-emerald-600 text-white font-bold" : "text-slate-600"}`}
                                         >
-                                          রত
+                                          রাত
                                         </button>
                                       </div>
 
@@ -1565,7 +1560,7 @@ export default function MealOrderApp() {
               )}
 
               <div className="bg-slate-50 p-3 rounded-xl space-y-1 text-xs text-slate-600">
-                <div className="flexzIndex justify-between">
+                <div className="flex justify-between">
                   <span>মোট নির্বাচিত দিন:</span>
                   <span className="font-bold text-slate-800">
                     {selectedDatesList.length} দিন (মোট {totalMealSlotsCount}{" "}
