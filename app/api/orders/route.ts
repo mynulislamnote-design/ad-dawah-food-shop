@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { orderStore } from "@/lib/orderStore";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
 
 export async function POST(request: Request) {
@@ -45,26 +45,23 @@ export async function POST(request: Request) {
         dinner: true,
       });
 
-      const order = await prisma.dailyOrder.create({
-        data: {
-          customerName,
-          customerPhone,
-          messName: messName || "সাধারণ মেস",
-          roomNo: roomNo || "N/A",
-          targetDate: formattedDate,
-          mealSlot: mealSlot || initialSlotState,
-          packageType: packageType || "REGULAR",
-          deliveryType: deliveryType || "HOME_DELIVERY",
-          deliveryCharge: Number(perDayDelivery),
-          totalAmount: Number(perDayAmount),
-          paymentMethod: paymentMethod || "WALLET",
-          isSkipped: false,
-        },
+      const order = orderStore.createOrder({
+        customerName,
+        customerPhone,
+        messName: messName || "সাধারণ মেস",
+        roomNo: roomNo || "N/A",
+        targetDate: formattedDate,
+        mealSlot: mealSlot || initialSlotState,
+        packageType: packageType || "REGULAR",
+        deliveryType: deliveryType || "HOME_DELIVERY",
+        deliveryCharge: Number(perDayDelivery),
+        totalAmount: Number(perDayAmount),
+        paymentMethod: paymentMethod || "WALLET",
       });
       createdOrders.push(order);
     }
 
-    // হোয়াটসঅ্যাপে অটোমেটিক মেসেজ পাঠানো (lib/whatsapp.ts নিজে থেকেই +88 ও বাংলা সংখ্যা ঠিক করে নেবে)
+    // হোয়াটসঅ্যাপে মেসেজ পাঠানো
     try {
       if (typeof sendWhatsAppMessage === "function") {
         const whatsappText = `🎉 *আসসালামু আলাইকুম ${customerName}!*
@@ -82,7 +79,6 @@ export async function POST(request: Request) {
 যেকোনো প্রয়োজনে আমাদের সাথে যোগাযোগ করুন। ধন্যবাদ!`;
 
         await sendWhatsAppMessage(customerPhone, whatsappText);
-        console.log(`✅ WhatsApp message triggered for: ${customerPhone}`);
       }
     } catch (waErr) {
       console.error("WhatsApp notification error:", waErr);
@@ -104,12 +100,9 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const phone = searchParams.get("phone");
+    const phone = searchParams.get("phone") || undefined;
 
-    const orders = await prisma.dailyOrder.findMany({
-      where: phone ? { customerPhone: phone } : undefined,
-      orderBy: { targetDate: "asc" },
-    });
+    const orders = orderStore.getAllOrders(phone);
     return NextResponse.json(orders);
   } catch (error) {
     return NextResponse.json(
@@ -124,15 +117,25 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const { orderId, isSkipped, mealSlot, packageType, totalAmount } = body;
 
-    const updated = await prisma.dailyOrder.update({
-      where: { id: orderId },
-      data: {
-        ...(isSkipped !== undefined && { isSkipped: Boolean(isSkipped) }),
-        ...(mealSlot !== undefined && { mealSlot: String(mealSlot) }),
-        ...(packageType !== undefined && { packageType: String(packageType) }),
-        ...(totalAmount !== undefined && { totalAmount: Number(totalAmount) }),
-      },
-    });
+    let updated = null;
+    if (isSkipped !== undefined && mealSlot === undefined) {
+      updated = orderStore.updateOrderSkip(orderId, isSkipped);
+    } else {
+      const updates: any = {};
+      if (isSkipped !== undefined) updates.isSkipped = Boolean(isSkipped);
+      if (mealSlot !== undefined) updates.mealSlot = String(mealSlot);
+      if (packageType !== undefined) updates.packageType = String(packageType);
+      if (totalAmount !== undefined) updates.totalAmount = Number(totalAmount);
+
+      updated = orderStore.updateOrderDetails(orderId, updates);
+    }
+
+    if (!updated) {
+      return NextResponse.json(
+        { error: "অর্ডার পাওয়া যায়নি।" },
+        { status: 404 },
+      );
+    }
 
     return NextResponse.json(updated);
   } catch (error) {
