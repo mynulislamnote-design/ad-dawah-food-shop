@@ -9,7 +9,6 @@ import {
   Printer,
   UtensilsCrossed,
   PlusCircle,
-  Plus,
   CheckCircle2,
   XCircle,
   Edit2,
@@ -21,6 +20,11 @@ import {
   Clock,
   Check,
   X,
+  Lock,
+  ShieldAlert,
+  LogOut,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 interface Order {
@@ -97,6 +101,42 @@ function parseOrderSlots(order: Order) {
 }
 
 export default function AdminDashboard() {
+  // সিকিউরিটি ও অথেনটিকেশন স্টেট
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [inputPassword, setInputPassword] = useState("");
+  const [passwordError, setPasswordError] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  // ব্রাউজার সেশনে লগইন চেক
+  useEffect(() => {
+    const authStatus = sessionStorage.getItem("ad_dawah_admin_auth");
+    if (authStatus === "true") {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  const handleAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    // ডিফল্ট পাসওয়ার্ড অথবা .env এর পাসওয়ার্ড
+    const correctPassword =
+      process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "AdDawah@2026";
+
+    if (inputPassword === correctPassword) {
+      sessionStorage.setItem("ad_dawah_admin_auth", "true");
+      setIsAuthenticated(true);
+      setPasswordError(false);
+    } else {
+      setPasswordError(true);
+    }
+  };
+
+  const handleAdminLogout = () => {
+    sessionStorage.removeItem("ad_dawah_admin_auth");
+    setIsAuthenticated(false);
+    setInputPassword("");
+  };
+
+  // মূল ড্যাশবোর্ড স্টেটসমূহ
   const [activeTab, setActiveTab] = useState<"ORDERS" | "MENU" | "WALLET">(
     "ORDERS",
   );
@@ -163,10 +203,11 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (isAuthenticated) {
+      fetchData();
+    }
+  }, [isAuthenticated]);
 
-  // ওয়ালেট রিকোয়েস্ট অনুমোদন বা রিজেক্ট
   const handleWalletAction = async (
     requestId: string,
     action: "APPROVE" | "REJECT",
@@ -339,15 +380,92 @@ export default function AdminDashboard() {
     (r) => r.status === "PENDING",
   ).length;
 
+  // ১. যদি পাসওয়ার্ড না দিয়ে থাকে তবে এই সিকিউরিটি লক স্ক্রিন শো করবে
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans text-slate-100">
+        <div className="w-full max-w-sm bg-slate-800/90 backdrop-blur-md rounded-3xl p-6 shadow-2xl border border-slate-700 space-y-5 animate-in fade-in zoom-in-95">
+          <div className="text-center space-y-2">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto shadow-inner">
+              <Lock className="w-7 h-7" />
+            </div>
+            <h2 className="text-lg font-black text-white">
+              আদ-দাওয়া অ্যাডমিন পোর্টাল
+            </h2>
+            <p className="text-xs text-slate-400">
+              এই পেজটি শুধুমাত্র শপের স্বত্বাধিকারীর জন্য সংরক্ষিত
+            </p>
+          </div>
+
+          <form onSubmit={handleAdminLogin} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-300 block">
+                মাস্টার সিক্রেট পাসওয়ার্ড দিন:
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="পাসওয়ার্ড লিখুন..."
+                  value={inputPassword}
+                  onChange={(e) => {
+                    setInputPassword(e.target.value);
+                    setPasswordError(false);
+                  }}
+                  required
+                  className="w-full text-sm pl-4 pr-10 py-3 rounded-xl bg-slate-950/70 border border-slate-600 focus:border-emerald-500 focus:outline-none text-white transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-200"
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+              {passwordError && (
+                <span className="text-[11px] font-bold text-rose-400 flex items-center gap-1 mt-1">
+                  <ShieldAlert className="w-3.5 h-3.5" /> ভুল পাসওয়ার্ড! আবার
+                  চেষ্টা করুন।
+                </span>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3 rounded-xl text-xs shadow-lg shadow-emerald-900/30 transition-all flex items-center justify-center gap-2 active:scale-95"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>ড্যাশবোর্ডে প্রবেশ করুন</span>
+            </button>
+          </form>
+
+          <div className="text-center">
+            <Link
+              href="/"
+              className="text-xs text-slate-400 hover:text-emerald-400 transition-colors"
+            >
+              ← কাস্টমার হোমপেজে ফিরে যান
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ২. পাসওয়ার্ড সঠিক হলে সম্পূর্ণ ড্যাশবোর্ড লোড হবে
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 p-4 md:p-8 font-sans">
       <div className="max-w-6xl mx-auto space-y-6">
-        {/* হেডার */}
+        {/* হেডার (লগআউট বাটন সহ) */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <div>
             <h1 className="text-2xl font-black text-emerald-800 flex items-center gap-2">
               <ChefHat className="w-7 h-7 text-emerald-600" />
-              আদ-দাওয়া ফুড শপ — মাস্টার এডমিন
+              আদ-দাওয়া ফুড শপ — মাস্টার অ্যাডমিন
             </h1>
             <p className="text-xs text-slate-500 mt-1">
               কিচেন শিট, মেস ডেলিভারি, ওয়ালেট রিচার্জ ও মেনু নিয়ন্ত্রণ
@@ -370,6 +488,15 @@ export default function AdminDashboard() {
             >
               <Printer className="w-3.5 h-3.5" />
               প্রিন্ট শিট
+            </button>
+            {/* সিকিউর লগআউট বাটন */}
+            <button
+              onClick={handleAdminLogout}
+              className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all"
+              title="অ্যাডমিন প্যানেল লক করুন"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              লক / লগআউট
             </button>
           </div>
         </div>
@@ -421,7 +548,6 @@ export default function AdminDashboard() {
         {/* ট্যাব ১: অর্ডার ও কিচেন শিট */}
         {activeTab === "ORDERS" && (
           <div className="space-y-6">
-            {/* ডেলিভারি চার্জ বক্স */}
             <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-100 border border-emerald-200 rounded-3xl p-5 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -483,7 +609,7 @@ export default function AdminDashboard() {
                   >
                     <Gift className="w-4 h-4 text-emerald-800" />
                     {isFreeDeliveryPromo
-                      ? "ফ্রি ডেলিভারি চালু আছে"
+                      ? "ফ্রি ডেলিভারি অফার চালু আছে"
                       : "ফ্রি ডেলিভারি অফার দিন (০৳)"}
                   </button>
                 </div>
@@ -501,7 +627,6 @@ export default function AdminDashboard() {
               </form>
             </div>
 
-            {/* ফিল্টার বার */}
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-emerald-600" />
@@ -561,7 +686,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* কিচেন সামারি কার্ড */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
                 <span className="text-xs font-semibold text-slate-500">
@@ -607,7 +731,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* ডেলিভারি তালিকা টেবিল */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                 <div>
@@ -744,7 +867,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ট্যাব ২: ওয়ালেট রিচার্জ অনুমোদন (নয়া ফিচার) */}
+        {/* ট্যাব ২: ওয়ালেট রিচার্জ অনুমোদন */}
         {activeTab === "WALLET" && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
