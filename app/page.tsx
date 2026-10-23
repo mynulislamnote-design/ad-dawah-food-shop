@@ -37,6 +37,7 @@ import {
   LogOut,
   ShieldCheck,
   Calendar,
+  ChevronUp,
 } from "lucide-react";
 
 const BANGLA_DAYS = ["রবি", "সোম", "মঙ্গল", "বুধ", "বৃহঃ", "শুক্র", "শনি"];
@@ -104,6 +105,12 @@ function getDaysForMonth(year: number, monthIndex: number) {
     }
   }
   return days;
+}
+
+interface ExtraItem {
+  id: string;
+  name: string;
+  price: number;
 }
 
 interface DaySlotConfig {
@@ -203,20 +210,13 @@ export default function MealOrderApp() {
   const [selectedPackage, setSelectedPackage] = useState<"REGULAR" | "CUSTOM">(
     "REGULAR",
   );
-  const [selectedSlot, setSelectedSlot] = useState<
-    "BREAKFAST" | "LUNCH" | "DINNER"
-  >("LUNCH");
-  const [breakfastChoice, setBreakfastChoice] = useState<
-    "KHICHURI" | "PARATHA"
-  >("KHICHURI");
-
   const [deliveryMethod, setDeliveryMethod] = useState<
     "HOME_DELIVERY" | "PICKUP"
   >("HOME_DELIVERY");
   const [adminDeliveryCharge, setAdminDeliveryCharge] = useState(15);
   const [isFreeDeliveryPromo, setIsFreeDeliveryPromo] = useState(false);
 
-  // অতিরিক্ত খাবার লিস্ট (extraItems)
+  // অতিরিক্ত খাবার লিস্ট
   const [extraItems, setExtraItems] = useState([
     { id: "ex1", name: "অতিরিক্ত সাদা ভাত", price: 15, count: 0 },
     { id: "ex2", name: "ডিম পোচ / ওমলেট", price: 20, count: 0 },
@@ -415,56 +415,8 @@ export default function MealOrderApp() {
     },
   ];
 
-  const fridayLunch = {
-    title:
-      regularMenuOverrides["REGULAR_FRIDAY"]?.name ||
-      "শুক্রবার স্পেশাল: শাহী বিফ দম বিরিয়ানি + বোরহানি",
-    price: regularMenuOverrides["REGULAR_FRIDAY"]?.price || 130,
-    img: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600&q=80",
-    desc: "গাওয়া ঘিয়ে রান্না বিফ দম বিরিয়ানি ও বোরহানি।",
-  };
+  const currentRegularMenu = lunchCycle[cycleIndex];
 
-  const breakfastOptions = {
-    KHICHURI: {
-      title:
-        regularMenuOverrides["REGULAR_BREAKFAST_KHICHURI"]?.name ||
-        "ভুনা খিচুড়ি + ডিম ভুনা/ভাজি",
-      price: regularMenuOverrides["REGULAR_BREAKFAST_KHICHURI"]?.price || 45,
-      img: "https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=600&q=80",
-      desc: "মুগ ও মসুর ডালে রান্না ঝরঝরে খিচুড়ি।",
-    },
-    PARATHA: {
-      title:
-        regularMenuOverrides["REGULAR_BREAKFAST_PARATHA"]?.name ||
-        "গরম পরোটা (৩টি) + ডিম ভাজি + ডাল-ভাজি",
-      price: regularMenuOverrides["REGULAR_BREAKFAST_PARATHA"]?.price || 40,
-      img: "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=600&q=80",
-      desc: "মুচমুচে গরম পরোটা ও ডিম ভাজি।",
-    },
-  };
-
-  const dinnerData = {
-    title:
-      cycleIndex % 2 === 0
-        ? regularMenuOverrides["REGULAR_DINNER_1"]?.name ||
-          "রাতের স্পেশাল ভুনা খিচুড়ি + বেগুন ও ডিম ভাজি"
-        : regularMenuOverrides["REGULAR_DINNER_2"]?.name ||
-          "রাতের ভাত + ডিম ভুনা + স্পেশাল ভর্তা + ডাল",
-    price: regularMenuOverrides["REGULAR_DINNER_1"]?.price || 65,
-    img: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80",
-    desc: "হালকা ও পুষ্টিকর সুষম রাতের খাবার।",
-  };
-
-  let currentRegularMenu = lunchCycle[cycleIndex];
-  if (selectedSlot === "BREAKFAST") {
-    currentRegularMenu = breakfastOptions[breakfastChoice];
-  } else if (selectedSlot === "LUNCH") {
-    currentRegularMenu = lunchCycle[cycleIndex];
-  } else {
-    currentRegularMenu = dinnerData;
-  }
-
-  // তারিখ টগল করা
   const toggleDateSelection = (dayObj: any) => {
     setQuickPreset("CUSTOM");
     setSelectedDatesMap((prev) => {
@@ -504,7 +456,6 @@ export default function MealOrderApp() {
     });
   };
 
-  // নির্দিষ্ট দিনের নির্দিষ্ট বেলায় অতিরিক্ত খাবার বাড়ানো/কমানো
   const updateDateSlotExtra = (
     dateStr: string,
     slotKey: string,
@@ -568,9 +519,7 @@ export default function MealOrderApp() {
 
   if (selectedPackage === "REGULAR") {
     const regularMealsCost =
-      totalBreakfasts * breakfastOptions.PARATHA.price +
-      totalLunches * 80 +
-      totalDinners * 60;
+      totalBreakfasts * 40 + totalLunches * 80 + totalDinners * 60;
     let discount = 0;
     if (quickPreset === "7DAYS") discount = 60;
     if (quickPreset === "15DAYS") discount = 150;
@@ -645,7 +594,9 @@ export default function MealOrderApp() {
 
   const handleProceedToCheckout = () => {
     if (selectedDatesList.length === 0 || totalMealSlotsCount === 0) {
-      alert("অনুগ্রহ করে অন্তত একটি দিন এবং বেলার খাবার সিলেক্ট করুন!");
+      alert(
+        "অনুগ্রহ করে ক্যালেন্ডার থেকে অন্তত একটি দিন এবং বেলার খাবার সিলেক্ট করুন!",
+      );
       return;
     }
     if (!isLoggedIn) {
@@ -749,15 +700,16 @@ export default function MealOrderApp() {
         });
       }
 
+      // অর্ডার সম্পন্ন হওয়ার সাথে সাথে পপআপ ওপেন হবে
       setOrderSuccess(true);
       setIsCheckoutOpen(false);
       setTrxId("");
+
       if (session?.user?.email) {
         fetch(`/api/auth/user?email=${encodeURIComponent(session.user.email)}`)
           .then((r) => r.json())
           .then((u) => u && setUserWallet(u.walletBalance || 0));
       }
-      setTimeout(() => setOrderSuccess(false), 7000);
     } catch (err) {
       alert("সার্ভারে সমস্যা হয়েছে।");
     } finally {
@@ -795,6 +747,7 @@ export default function MealOrderApp() {
                   isLoggedIn ? setIsRechargeModalOpen(true) : signIn("google")
                 }
                 className="bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-600/50 px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-inner transition-all"
+                title="ওয়ালেট রিচার্জ করুন"
               >
                 <Wallet className="w-3.5 h-3.5 text-amber-300" />
                 <span className="text-xs font-black text-amber-200">
@@ -845,20 +798,6 @@ export default function MealOrderApp() {
 
       {/* মূল কন্টেন্ট */}
       <main className="max-w-md mx-auto px-4 mt-3 space-y-4">
-        {orderSuccess && (
-          <div className="bg-emerald-600 text-white rounded-2xl p-4 shadow-xl flex items-center gap-3">
-            <CheckCircle2 className="w-7 h-7 shrink-0 text-amber-300" />
-            <div>
-              <h4 className="font-extrabold text-sm">
-                আলহামদুলিল্লাহ! অর্ডার নিশ্চিত হয়েছে 🎉
-              </h4>
-              <p className="text-xs text-emerald-100 mt-0.5">
-                আপনার প্রতিটি নির্বাচিত দিনের শিডিউল সেভ হয়েছে।
-              </p>
-            </div>
-          </div>
-        )}
-
         {/* ভিডিও টিউটোরিয়াল বাটন */}
         <div
           onClick={() => setIsVideoModalOpen(true)}
@@ -1082,7 +1021,7 @@ export default function MealOrderApp() {
           </div>
         </div>
 
-        {/* ক্যালেন্ডার ও পার-ডে স্লট কাস্টমাইজার (প্রতিটি দিনের কার্ডের ভেতরে অতিরিক্ত খাবার বাটনসহ) */}
+        {/* ক্যালেন্ডার ও পার-ডে স্লট কাস্টমাইজার */}
         <div className="bg-white p-4 rounded-3xl border border-slate-200/90 shadow-sm space-y-3">
           <div className="flex items-center justify-between border-b pb-2">
             <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -1628,6 +1567,92 @@ export default function MealOrderApp() {
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
               ></iframe>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* নতুন সংযোজন: সেন্টারে ভাসমান চমৎকার অর্ডার কনফার্মেশন পপআপ মডাল */}
+      {orderSuccess && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl text-center space-y-4 relative animate-in zoom-in-95 duration-300 border border-emerald-100">
+            {/* টপ ক্লোজ বাটন */}
+            <button
+              type="button"
+              onClick={() => setOrderSuccess(false)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* অ্যানিমেটেড কনগ্রাচুলেশন আইকন */}
+            <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-xl shadow-emerald-600/30 ring-8 ring-emerald-50">
+              <CheckCircle2 className="w-10 h-10 text-white stroke-[2.5]" />
+            </div>
+
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-100/70 px-3 py-1 rounded-full">
+                অর্ডার সফল হয়েছে
+              </span>
+              <h3 className="text-xl font-black text-slate-900 mt-2">
+                আলহামদুলিল্লাহ!
+              </h3>
+              <p className="text-sm font-bold text-emerald-800 mt-0.5">
+                আপনার খাবারের অর্ডারটি নিশ্চিত হয়েছে 🎉
+              </p>
+              <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                আপনার প্রতিটি নির্বাচিত দিনের জন্য বাবুর্চির রান্নার শিডিউলে
+                খাবার যুক্ত করা হয়েছে এবং আপনার হোয়াটসঅ্যাপে কনফার্মেশন পাঠানো
+                হয়েছে।
+              </p>
+            </div>
+
+            {/* সংক্ষেপ রসিদ বক্স */}
+            <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-100 text-left space-y-1.5 text-xs">
+              <div className="flex justify-between text-slate-600">
+                <span>মোট দিন:</span>
+                <span className="font-bold text-slate-900">
+                  {selectedDatesList.length} দিন ({totalMealSlotsCount} বেলা)
+                </span>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>মেস ও রুম:</span>
+                <span className="font-bold text-slate-900">
+                  {messName || "সাধারণ মেস"} (রুম: {roomNo || "N/A"})
+                </span>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>পেমেন্ট মাধ্যম:</span>
+                <span className="font-bold text-slate-900">
+                  {paymentMethod === "WALLET"
+                    ? "ওয়ালেট ব্যালেন্স"
+                    : "বিকাশ / নগদ"}
+                </span>
+              </div>
+              <div className="border-t border-slate-200 pt-1.5 flex justify-between font-black text-sm text-slate-900">
+                <span>পরিশোধিত বিল:</span>
+                <span className="text-emerald-700">৳{grandTotal}</span>
+              </div>
+            </div>
+
+            {/* অ্যাকশন বাটনসমূহ */}
+            <div className="space-y-2 pt-1">
+              <Link
+                href="/my-orders"
+                onClick={() => setOrderSuccess(false)}
+                className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-700/25 transition-all"
+              >
+                <ReceiptText className="w-4 h-4" />
+                <span>আমার অর্ডার ও মিল শিডিউল দেখুন</span>
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => setOrderSuccess(false)}
+                className="w-full py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"
+              >
+                ঠিক আছে, বন্ধ করুন
+              </button>
             </div>
           </div>
         </div>
