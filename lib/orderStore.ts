@@ -17,6 +17,7 @@ export interface StoredOrder {
   totalAmount: number;
   paymentMethod: string;
   isSkipped: boolean;
+  status: "PENDING_VERIFICATION" | "APPROVED"; // পেমেন্ট ভেরিফিকেশন স্ট্যাটাস
   createdAt: string;
 }
 
@@ -54,13 +55,19 @@ export const orderStore = {
   },
 
   createOrder(
-    orderData: Omit<StoredOrder, "id" | "createdAt" | "isSkipped">,
+    orderData: Omit<StoredOrder, "id" | "createdAt" | "isSkipped" | "status">,
   ): StoredOrder {
     const orders = getOrdersData();
+
+    // ওয়ালেট পেমেন্ট হলে সরাসরি APPROVED, বিকাশ/নগদ হলে PENDING_VERIFICATION
+    const isWallet = orderData.paymentMethod.includes("WALLET");
+    const status = isWallet ? "APPROVED" : "PENDING_VERIFICATION";
+
     const newOrder: StoredOrder = {
       ...orderData,
       id: "ord_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
       isSkipped: false,
+      status,
       createdAt: new Date().toISOString(),
     };
     orders.unshift(newOrder);
@@ -74,6 +81,16 @@ export const orderStore = {
     if (idx === -1) return null;
 
     orders[idx].isSkipped = isSkipped;
+    saveOrdersData(orders);
+    return orders[idx];
+  },
+
+  updateOrderStatus(orderId: string, status: "APPROVED"): StoredOrder | null {
+    const orders = getOrdersData();
+    const idx = orders.findIndex((o) => o.id === orderId);
+    if (idx === -1) return null;
+
+    orders[idx].status = status;
     saveOrdersData(orders);
     return orders[idx];
   },

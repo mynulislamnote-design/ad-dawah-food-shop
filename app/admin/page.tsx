@@ -26,6 +26,8 @@ import {
   LogOut,
   Eye,
   EyeOff,
+  Plus,
+  CreditCard,
 } from "lucide-react";
 
 interface Order {
@@ -42,6 +44,7 @@ interface Order {
   totalAmount: number;
   paymentMethod: string;
   isSkipped: boolean;
+  status: "PENDING_VERIFICATION" | "APPROVED";
   createdAt: string;
 }
 
@@ -66,7 +69,8 @@ interface WalletRequest {
 }
 
 function parseOrderSlots(order: Order) {
-  if (order.isSkipped) return { breakfast: false, lunch: false, dinner: false };
+  if (order.isSkipped || order.status !== "APPROVED")
+    return { breakfast: false, lunch: false, dinner: false };
   try {
     const parsed = JSON.parse(order.mealSlot);
     if (typeof parsed === "object" && parsed !== null) {
@@ -102,13 +106,11 @@ function parseOrderSlots(order: Order) {
 }
 
 export default function AdminDashboard() {
-  // সিকিউরিটি ও অথেনটিকেশন স্টেট
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [inputPassword, setInputPassword] = useState("");
   const [passwordError, setPasswordError] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // ব্রাউজার সেশনে লগইন চেক
   useEffect(() => {
     const authStatus = sessionStorage.getItem("ad_dawah_admin_auth");
     if (authStatus === "true") {
@@ -118,11 +120,10 @@ export default function AdminDashboard() {
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // ডিফল্ট পাসওয়ার্ড অথবা .env এর পাসওয়ার্ড
     const correctPassword =
-      process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "AdDawah@2026";
+      process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "Addawah@food";
 
-    if (inputPassword === correctPassword) {
+    if (inputPassword.trim() === correctPassword.trim()) {
       sessionStorage.setItem("ad_dawah_admin_auth", "true");
       setIsAuthenticated(true);
       setPasswordError(false);
@@ -137,10 +138,9 @@ export default function AdminDashboard() {
     setInputPassword("");
   };
 
-  // মূল ড্যাশবোর্ড স্টেটসমূহ
-  const [activeTab, setActiveTab] = useState<"ORDERS" | "MENU" | "WALLET">(
-    "ORDERS",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "ORDERS" | "PAYMENTS" | "WALLET" | "MENU"
+  >("ORDERS");
   const [menuSubTab, setMenuSubTab] = useState<"REGULAR" | "EXTRAS" | "CUSTOM">(
     "REGULAR",
   );
@@ -209,6 +209,29 @@ export default function AdminDashboard() {
     }
   }, [isAuthenticated]);
 
+  // বিকাশ/নগদ অর্ডারের পেমেন্ট অনুমোদন (Approve Payment)
+  const handleApproveOrderPayment = async (orderId: string) => {
+    try {
+      const res = await fetch("/api/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, action: "APPROVE_PAYMENT" }),
+      });
+      if (res.ok) {
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === orderId ? { ...o, status: "APPROVED" } : o,
+          ),
+        );
+        alert(
+          "পেমেন্ট নিশ্চিত করা হয়েছে! এখন এটি কিচেন ও ডেলিভারি শিটে যুক্ত হয়েছে।",
+        );
+      }
+    } catch (err) {
+      alert("পেমেন্ট এপ্রুভ ব্যর্থ হয়েছে!");
+    }
+  };
+
   const handleWalletAction = async (
     requestId: string,
     action: "APPROVE" | "REJECT",
@@ -239,9 +262,18 @@ export default function AdminDashboard() {
   };
 
   const displayedOrders = useMemo(() => {
-    if (selectedFilterDate === "ALL") return orders;
-    return orders.filter((o) => o.targetDate === selectedFilterDate);
+    // শুধুমাত্র অনুমোদিত (APPROVED) এবং স্কিপ না করা অর্ডারগুলো কিচেন শিটে দেখাবে
+    const activeVerifiedOrders = orders.filter((o) => o.status === "APPROVED");
+    if (selectedFilterDate === "ALL") return activeVerifiedOrders;
+    return activeVerifiedOrders.filter(
+      (o) => o.targetDate === selectedFilterDate,
+    );
   }, [orders, selectedFilterDate]);
+
+  // পেন্ডিং পেমেন্ট অর্ডারের তালিকা
+  const pendingPaymentOrders = useMemo(() => {
+    return orders.filter((o) => o.status === "PENDING_VERIFICATION");
+  }, [orders]);
 
   let breakfastCount = 0;
   let lunchCount = 0;
@@ -380,8 +412,8 @@ export default function AdminDashboard() {
   const pendingWalletCount = walletRequests.filter(
     (r) => r.status === "PENDING",
   ).length;
+  const pendingPaymentCount = pendingPaymentOrders.length;
 
-  // ১. যদি পাসওয়ার্ড না দিয়ে থাকে তবে এই সিকিউরিটি লক স্ক্রিন শো করবে
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans text-slate-100">
@@ -457,11 +489,10 @@ export default function AdminDashboard() {
     );
   }
 
-  // ২. পাসওয়ার্ড সঠিক হলে সম্পূর্ণ ড্যাশবোর্ড লোড হবে
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 p-4 md:p-8 font-sans">
       <div className="max-w-6xl mx-auto space-y-6">
-        {/* হেডার (লগআউট বাটন সহ) */}
+        {/* হেডার */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <div>
             <h1 className="text-2xl font-black text-emerald-800 flex items-center gap-2">
@@ -469,7 +500,7 @@ export default function AdminDashboard() {
               আদ-দাওয়া ফুড শপ — মাস্টার অ্যাডমিন
             </h1>
             <p className="text-xs text-slate-500 mt-1">
-              কিচেন শিট, মেস ডেলিভারি, ওয়ালেট রিচার্জ ও মেনু নিয়ন্ত্রণ
+              কিচেন শিট, পেমেন্ট ভেরিফিকেশন, ওয়ালেট ও মেনু নিয়ন্ত্রণ
             </p>
           </div>
 
@@ -490,11 +521,9 @@ export default function AdminDashboard() {
               <Printer className="w-3.5 h-3.5" />
               প্রিন্ট শিট
             </button>
-            {/* সিকিউর লগআউট বাটন */}
             <button
               onClick={handleAdminLogout}
               className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all"
-              title="অ্যাডমিন প্যানেল লক করুন"
             >
               <LogOut className="w-3.5 h-3.5" />
               লক / লগআউট
@@ -514,6 +543,23 @@ export default function AdminDashboard() {
           >
             <Truck className="w-4 h-4" />
             অর্ডার ও কিচেন শিট
+          </button>
+
+          <button
+            onClick={() => setActiveTab("PAYMENTS")}
+            className={`px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shrink-0 transition-all relative ${
+              activeTab === "PAYMENTS"
+                ? "bg-emerald-600 text-white shadow-sm"
+                : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+            }`}
+          >
+            <CreditCard className="w-4 h-4" />
+            অর্ডার পেমেন্ট যাচাইকরণ
+            {pendingPaymentCount > 0 && (
+              <span className="bg-pink-600 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full">
+                {pendingPaymentCount}
+              </span>
+            )}
           </button>
 
           <button
@@ -610,7 +656,7 @@ export default function AdminDashboard() {
                   >
                     <Gift className="w-4 h-4 text-emerald-800" />
                     {isFreeDeliveryPromo
-                      ? "ফ্রি ডেলিভারি অফার চালু আছে"
+                      ? "ফ্রি ডেলিভারি চালু আছে"
                       : "ফ্রি ডেলিভারি অফার দিন (০৳)"}
                   </button>
                 </div>
@@ -771,7 +817,7 @@ export default function AdminDashboard() {
                           colSpan={7}
                           className="text-center p-8 text-slate-400"
                         >
-                          এই তারিখে কোনো অর্ডার নেই।
+                          এই তারিখে কোনো অনুমোদিত অর্ডার নেই।
                         </td>
                       </tr>
                     ) : (
@@ -834,28 +880,13 @@ export default function AdminDashboard() {
                                     রাত
                                   </span>
                                 )}
-                                {!slots.breakfast &&
-                                  !slots.lunch &&
-                                  !slots.dinner && (
-                                    <span className="text-rose-500 font-bold text-[10px] bg-rose-50 px-1.5 py-0.5 rounded">
-                                      কোনো মিল নেই (স্কিপ)
-                                    </span>
-                                  )}
                               </div>
                             </td>
                             <td className="p-3.5 max-w-xs truncate text-[11px] text-amber-800 font-medium">
                               {extraText}
                             </td>
-                            <td className="p-3.5 font-bold text-right">
-                              {order.isSkipped || !hasAnySlot ? (
-                                <span className="text-slate-400 line-through text-[11px]">
-                                  ৳০ (স্কিপ)
-                                </span>
-                              ) : (
-                                <span className="text-slate-900">
-                                  ৳{order.totalAmount}
-                                </span>
-                              )}
+                            <td className="p-3.5 font-bold text-right text-slate-900">
+                              ৳{order.totalAmount}
                             </td>
                           </tr>
                         );
@@ -868,7 +899,96 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ট্যাব ২: ওয়ালেট রিচার্জ অনুমোদন */}
+        {/* ট্যাব ২: অর্ডার পেমেন্ট যাচাইকরণ (নতুন ট্যাব) */}
+        {activeTab === "PAYMENTS" && (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h2 className="font-bold text-slate-800 text-base flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-pink-600" />
+                  বিকাশ / নগদ পেমেন্ট যাচাইকরণ তালিকা
+                </h2>
+                <p className="text-[11px] text-slate-500">
+                  কাস্টমার TrxID দিয়ে অর্ডার করার পর এখানে জমা হবে। আপনি পেমেন্ট
+                  নিশ্চিত করলে তবেই তা কিচেন শিটে যাবে।
+                </p>
+              </div>
+              <span className="text-xs font-bold text-pink-800 bg-pink-50 px-3 py-1 rounded-full border border-pink-200">
+                যাচাইাধীন: {pendingPaymentCount} টি
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-600">
+                <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
+                  <tr>
+                    <th className="p-3.5">কাস্টমার</th>
+                    <th className="p-3.5">মোবাইল</th>
+                    <th className="p-3.5">মেস ও রুম</th>
+                    <th className="p-3.5">তারিখ ও প্যাকেজ</th>
+                    <th className="p-3.5">পেমেন্ট ও TrxID</th>
+                    <th className="p-3.5">বিল</th>
+                    <th className="p-3.5 text-right">অ্যাকশন</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {pendingPaymentOrders.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="text-center p-8 text-slate-400"
+                      >
+                        এখনো যাচাই করার মতো কোনো নতুন বিকাশ অর্ডার নেই।
+                      </td>
+                    </tr>
+                  ) : (
+                    pendingPaymentOrders.map((order) => (
+                      <tr
+                        key={order.id}
+                        className="hover:bg-slate-50 transition-colors"
+                      >
+                        <td className="p-3.5 font-bold text-slate-800">
+                          {order.customerName}
+                        </td>
+                        <td className="p-3.5 font-medium">
+                          {order.customerPhone}
+                        </td>
+                        <td className="p-3.5">
+                          {order.messName} (রুম: {order.roomNo})
+                        </td>
+                        <td className="p-3.5">
+                          <span className="font-bold text-slate-800 block">
+                            {order.targetDate}
+                          </span>
+                          <span className="text-[10px] text-slate-500">
+                            {order.packageType}
+                          </span>
+                        </td>
+                        <td className="p-3.5 font-mono font-bold text-pink-700 bg-pink-50/50 px-2 py-1 rounded">
+                          {order.paymentMethod}
+                        </td>
+                        <td className="p-3.5 font-black text-slate-900">
+                          ৳{order.totalAmount}
+                        </td>
+                        <td className="p-3.5 text-right">
+                          <button
+                            onClick={() => handleApproveOrderPayment(order.id)}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 ml-auto shadow-xs"
+                          >
+                            <Check className="w-3.5 h-3.5" /> পেমেন্ট নিশ্চিত
+                            করুন
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ট্যাব ৩: ওয়ালেট রিচার্জ অনুমোদন */}
         {activeTab === "WALLET" && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
@@ -985,7 +1105,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ট্যাব ৩: মেনু ও প্রাইস ম্যানেজার */}
+        {/* ট্যাব ৪: মেনু ও প্রাইস ম্যানেজার */}
         {activeTab === "MENU" && (
           <div className="space-y-6">
             <div className="flex gap-2 bg-white p-2 rounded-2xl border border-slate-200 overflow-x-auto">
