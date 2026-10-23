@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendWhatsAppMessage } from "@/lib/whatsapp"; // <-- ১. হোয়াটসঅ্যাপ ফাংশন ইমপোর্ট করা হলো
+import { sendWhatsAppMessage } from "@/lib/whatsapp";
 
-// ১. নতুন অর্ডার তৈরি
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -40,7 +39,6 @@ export async function POST(request: Request) {
       currentDate.setDate(startDate.getDate() + i);
       const formattedDate = currentDate.toISOString().split("T")[0];
 
-      // ডিফল্টভাবে ৩ বেলা অন থাকবে (সকাল: অন, দুপুর: অন, রাত: অন)
       const initialSlotState = JSON.stringify({
         breakfast: true,
         lunch: true,
@@ -54,7 +52,7 @@ export async function POST(request: Request) {
           messName: messName || "সাধারণ মেস",
           roomNo: roomNo || "N/A",
           targetDate: formattedDate,
-          mealSlot: initialSlotState,
+          mealSlot: mealSlot || initialSlotState,
           packageType: packageType || "REGULAR",
           deliveryType: deliveryType || "HOME_DELIVERY",
           deliveryCharge: Number(perDayDelivery),
@@ -66,35 +64,29 @@ export async function POST(request: Request) {
       createdOrders.push(order);
     }
 
-    // ==========================================
-    // ২. অর্ডার সফলভাবে সেভ হওয়ার পর হোয়াটসঅ্যাপ মেসেজ পাঠানো
-    // ==========================================
+    // হোয়াটসঅ্যাপে অটোমেটিক মেসেজ পাঠানো (lib/whatsapp.ts নিজে থেকেই +88 ও বাংলা সংখ্যা ঠিক করে নেবে)
     try {
-      const formattedDateStr = startDate.toLocaleDateString("bn-BD");
+      if (typeof sendWhatsAppMessage === "function") {
+        const whatsappText = `🎉 *আসসালামু আলাইকুম ${customerName}!*
 
-      const whatsappMessage = `🎉 *আপনার অর্ডার কনফার্ম হয়েছে!*
+আদ-দাওয়া ফুড শপে আপনার খাবারের প্রি-অর্ডারটি সফলভাবে গৃহীত হয়েছে।
 
-আসসালামੁ আলাইকুম *${customerName}*,
-আদ-দাওয়া ফুড শপে আপনার প্রি-অর্ডারটি সফলভাবে রেকর্ড করা হয়েছে।
+📋 *অর্ডারের বিবরণ:*
+📅 তারিখ: ${targetDate} ${daysToCreate > 1 ? `(মোট ${daysToCreate} দিন)` : ""}
+🍱 প্যাকেজ: ${packageType}
+💰 মোট বিল: ৳${totalAmount}
+🛵 ডেলিভারি: ${deliveryType === "HOME_DELIVERY" ? "হোম ডেলিভারি" : "সেলফ পিকআপ"}
+📍 মেস ও রুম: ${messName || "সাধারণ মেস"} (রুম: ${roomNo || "N/A"})
+💳 পেমেন্ট: ${paymentMethod}
 
-📦 *প্যাকেজ:* ${packageType || "REGULAR"}
-⏱️ *মেয়াদ:* ${daysToCreate} দিন
-💰 *সর্বমোট বিল:* ${totalAmount} টাকা
-🏠 *মেস/ঠিকানা:* ${messName || "সাধারণ মেস"}, রুম: ${roomNo || "N/A"}
-💳 *পেমেন্ট পদ্ধতি:* ${paymentMethod || "WALLET"}
+যেকোনো প্রয়োজনে আমাদের সাথে যোগাযোগ করুন। ধন্যবাদ!`;
 
-আমাদের সেবা গ্রহণ করার জন্য ধন্যবাদ! ❤️`;
-
-      // ব্যাকগ্রাউন্ডে মেসেজ পাঠাবে, যাতে মেইন অর্ডারের রেসপন্স স্লো না হয়
-      sendWhatsAppMessage(customerPhone, whatsappMessage)
-        .then(() =>
-          console.log("WhatsApp order notification sent to:", customerPhone),
-        )
-        .catch((err) => console.error("WhatsApp send error:", err));
+        await sendWhatsAppMessage(customerPhone, whatsappText);
+        console.log(`✅ WhatsApp message triggered for: ${customerPhone}`);
+      }
     } catch (waErr) {
-      console.error("WhatsApp block execution error:", waErr);
+      console.error("WhatsApp notification error:", waErr);
     }
-    // ==========================================
 
     return NextResponse.json(
       { success: true, count: createdOrders.length, orders: createdOrders },
@@ -109,7 +101,6 @@ export async function POST(request: Request) {
   }
 }
 
-// ২. অর্ডার খোঁজা
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -128,7 +119,6 @@ export async function GET(request: Request) {
   }
 }
 
-// ৩. নির্দিষ্ট বেলার স্কিপ ও অতিরিক্ত খাবার আপডেট API
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
@@ -146,6 +136,6 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json(updated);
   } catch (error) {
-    return NextResponse.json({ error: "আপডেট ব্যর্থ হয়েছে." }, { status: 500 });
+    return NextResponse.json({ error: "আপডেট ব্যর্থ হয়েছে।" }, { status: 500 });
   }
 }
