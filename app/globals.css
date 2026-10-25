@@ -1,1 +1,4 @@
 @import "tailwindcss";
+html {
+  font-size: 15px; /* ডিফল্ট ১৬ পিক্সেল থেকে কমিয়ে ১৪px বা বাড়িয়ে ১৭px করতে পারেন */
+}
