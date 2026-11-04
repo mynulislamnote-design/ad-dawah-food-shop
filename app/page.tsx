@@ -139,8 +139,6 @@ export default function MealOrderApp() {
   const [rechargeTrxId, setRechargeTrxId] = useState("");
   const [isSubmittingRecharge, setIsSubmittingRecharge] = useState(false);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
-
-  // ৭ দিনের রুটিন মেনু পপআপ স্টেট
   const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
 
   // ক্যালেন্ডার ও মাস
@@ -395,7 +393,38 @@ export default function MealOrderApp() {
         ? 0
         : adminDeliveryCharge;
 
-  // ৭ দিনের ফুল রুটিন মেনু লিস্ট (মডেল ডাটা)
+  const cycleIndex =
+    Math.abs(Math.floor(new Date().getTime() / (1000 * 60 * 60 * 24))) % 3;
+
+  const lunchCycle = [
+    {
+      title:
+        regularMenuOverrides["REGULAR_LUNCH_DAY1"]?.name ||
+        "১ম দিন: ডিম ভুনা + ঘন ডাল + আলু ভর্তা + ভাত",
+      price: regularMenuOverrides["REGULAR_LUNCH_DAY1"]?.price || 70,
+      img: "https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=600&q=80",
+      desc: "গরম ধোঁয়া ওঠা বাসমতি চালের ভাত ও ডিম ভুনা।",
+    },
+    {
+      title:
+        regularMenuOverrides["REGULAR_LUNCH_DAY2"]?.name ||
+        "২য় দিন: রুই মাছের ঝোল + সবজি + ডাল + ভাত",
+      price: regularMenuOverrides["REGULAR_LUNCH_DAY2"]?.price || 80,
+      img: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80",
+      desc: "তাজা বড় রুই মাছের জিরা বাটা ঝোল।",
+    },
+    {
+      title:
+        regularMenuOverrides["REGULAR_LUNCH_DAY3"]?.name ||
+        "৩য় দিন: দেশি মুরগির ঝোল + সবজি + ডাল + ভাত",
+      price: regularMenuOverrides["REGULAR_LUNCH_DAY3"]?.price || 90,
+      img: "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=600&q=80",
+      desc: "দেশি মুরগির মাংসের তরকারি ও ঘন ডাল।",
+    },
+  ];
+
+  const currentRegularMenu = lunchCycle[cycleIndex];
+
   const fullWeekRoutine = [
     {
       day: "শনিবার",
@@ -440,38 +469,6 @@ export default function MealOrderApp() {
       dinner: "ডিম ভুনা + খিচুড়ি",
     },
   ];
-
-  const cycleIndex =
-    Math.abs(Math.floor(new Date().getTime() / (1000 * 60 * 60 * 24))) % 3;
-
-  const lunchCycle = [
-    {
-      title:
-        regularMenuOverrides["REGULAR_LUNCH_DAY1"]?.name ||
-        "১ম দিন: ডিম ভুনা + ঘন ডাল + আলু ভর্তা + ভাত",
-      price: regularMenuOverrides["REGULAR_LUNCH_DAY1"]?.price || 70,
-      img: "https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=600&q=80",
-      desc: "গরম ধোঁয়া ওঠা বাসমতি চালের ভাত ও ডিম ভুনা।",
-    },
-    {
-      title:
-        regularMenuOverrides["REGULAR_LUNCH_DAY2"]?.name ||
-        "২য় দিন: রুই মাছের ঝোল + সবজি + ডাল + ভাত",
-      price: regularMenuOverrides["REGULAR_LUNCH_DAY2"]?.price || 80,
-      img: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80",
-      desc: "তাজা বড় রুই মাছের জিরা বাটা ঝোল।",
-    },
-    {
-      title:
-        regularMenuOverrides["REGULAR_LUNCH_DAY3"]?.name ||
-        "৩য় দিন: দেশি মুরগির ঝোল + সবজি + ডাল + ভাত",
-      price: regularMenuOverrides["REGULAR_LUNCH_DAY3"]?.price || 90,
-      img: "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=600&q=80",
-      desc: "দেশি মুরগির মাংসের তরকারি ও ঘন ডাল।",
-    },
-  ];
-
-  const currentRegularMenu = lunchCycle[cycleIndex];
 
   const toggleDateSelection = (dayObj: any) => {
     setQuickPreset("CUSTOM");
@@ -834,7 +831,7 @@ export default function MealOrderApp() {
                   onClick={() => signIn("google")}
                   className="bg-white text-emerald-900 font-extrabold text-[11px] px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm"
                 >
-                  <LogIn className="w-3.5 h-3.5 text-emerald-700" /> লগইন
+                  <LogIn className="w-3 h-3 text-emerald-700" /> লগইন
                 </button>
               )}
             </div>
@@ -1027,7 +1024,7 @@ export default function MealOrderApp() {
           </div>
         )}
 
-        {/* নতুন সংযোজন: ৭ দিনের রুটিন মেনু দেখার পপআপ বাটন */}
+        {/* ৭ দিনের রুটিন মেনু দেখার বাটন */}
         <div className="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
@@ -1715,4 +1712,3 @@ export default function MealOrderApp() {
     </div>
   );
 }
-x;
