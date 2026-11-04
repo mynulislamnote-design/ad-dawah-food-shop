@@ -284,6 +284,10 @@ export default function MealOrderApp() {
     },
   ]);
 
+  const [regularMenuOverrides, setRegularMenuOverrides] = useState<{
+    [key: string]: { name: string; price: number };
+  }>({});
+
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"BKASH" | "WALLET">(
     "BKASH",
@@ -296,12 +300,12 @@ export default function MealOrderApp() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [messName, setMessName] = useState("");
   const [roomNo, setRoomNo] = useState("");
+  const [userWallet, setUserWallet] = useState(0);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
 
-  // ইউজার ও ওয়ালেট ব্যালেন্স লাইভ ফেচ
-  const fetchUserData = () => {
+  useEffect(() => {
     if (session?.user?.email) {
       setCustomerName(session.user.name || "");
       fetch(`/api/auth/user?email=${encodeURIComponent(session.user.email)}`)
@@ -318,10 +322,6 @@ export default function MealOrderApp() {
         })
         .catch((err) => console.error(err));
     }
-  };
-
-  useEffect(() => {
-    fetchUserData();
   }, [session]);
 
   useEffect(() => {
@@ -368,6 +368,19 @@ export default function MealOrderApp() {
               })),
             );
           }
+
+          const regOverrides: {
+            [key: string]: { name: string; price: number };
+          } = {};
+          data.forEach((item: any) => {
+            if (item.mealSlot.startsWith("REGULAR_")) {
+              regOverrides[item.mealSlot] = {
+                name: item.nameBn,
+                price: item.price,
+              };
+            }
+          });
+          setRegularMenuOverrides(regOverrides);
         }
       })
       .catch((err) => console.error(err));
@@ -464,35 +477,6 @@ export default function MealOrderApp() {
     });
   };
 
-  const updateDateSlotExtra = (
-    dateStr: string,
-    slotKey: string,
-    itemId: string,
-    delta: number,
-  ) => {
-    setSelectedDatesMap((prev) => {
-      const dayConfig = prev[dateStr];
-      if (!dayConfig) return prev;
-      const slotExtras = dayConfig.extras[slotKey] || {};
-      const currentCount = slotExtras[itemId] || 0;
-      const newCount = Math.max(0, currentCount + delta);
-
-      return {
-        ...prev,
-        [dateStr]: {
-          ...dayConfig,
-          extras: {
-            ...dayConfig.extras,
-            [slotKey]: {
-              ...slotExtras,
-              [itemId]: newCount,
-            },
-          },
-        },
-      };
-    });
-  };
-
   const selectedDatesList = Object.values(selectedDatesMap);
   let totalBreakfasts = 0;
   let totalLunches = 0;
@@ -558,7 +542,6 @@ export default function MealOrderApp() {
     setTimeout(() => setCopiedNumber(false), 2000);
   };
 
-  // ওয়ালেট রিচার্জ রিকোয়েস্ট সাবমিট (সঠিক API ও সেশন হ্যান্ডেলিং)
   const handleRechargeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!session?.user?.email) {
@@ -586,7 +569,7 @@ export default function MealOrderApp() {
         body: JSON.stringify({
           email: session.user.email,
           customerName: customerName || session.user.name,
-          customerPhone: customerPhone || "N/A",
+          customerPhone: customerPhone,
           amount: rechargeAmount,
           paymentMethod: rechargePaymentMethod,
           trxId: rechargeTrxId,
@@ -595,7 +578,7 @@ export default function MealOrderApp() {
 
       if (res.ok) {
         alert(
-          "আলহামদুলিল্লাহ! আপনার রিচার্জ রিকোয়েস্ট এডমিনের কাছে পাঠানো হয়েছে। এডমিন অনুমোদন করলেই ওয়ালেটে টাকা যোগ হবে।",
+          "আলহামদুলিল্লাহ! আপনার রিচার্জ রিকোয়েস্ট এডমিনের কাছে পাঠানো হয়েছে।",
         );
         setIsRechargeModalOpen(false);
         setRechargeTrxId("");
@@ -718,7 +701,12 @@ export default function MealOrderApp() {
       setOrderSuccess(true);
       setIsCheckoutOpen(false);
       setTrxId("");
-      fetchUserData(); // ওয়ালেট ব্যালেন্স রিফ্রেশ
+
+      if (session?.user?.email) {
+        fetch(`/api/auth/user?email=${encodeURIComponent(session.user.email)}`)
+          .then((r) => r.json())
+          .then((u) => u && setUserWallet(u.walletBalance || 0));
+      }
     } catch (err) {
       alert("সার্ভারে সমস্যা হয়েছে।");
     } finally {
@@ -807,28 +795,40 @@ export default function MealOrderApp() {
 
       {/* মূল কন্টেন্ট */}
       <main className="max-w-md mx-auto px-4 mt-3 space-y-4">
-        {/* ভিডিও টিউটোরিয়াল বাটন */}
+        {/* ভিডিও টিউটোরিয়াল বাটন (ব্যাকগ্রাউন্ডে প্রিমিয়াম খাবারের ছবি সহ) */}
         <div
           onClick={() => setIsVideoModalOpen(true)}
-          className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 rounded-2xl p-3 shadow-md flex items-center justify-between text-white cursor-pointer hover:shadow-lg transition-all active:scale-[0.99] border border-amber-300/40"
+          className="relative overflow-hidden rounded-2xl p-4 shadow-md flex items-center justify-between text-white cursor-pointer hover:shadow-lg transition-all active:scale-[0.99] border border-amber-300/40"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-white/25 backdrop-blur-md flex items-center justify-center shadow-inner animate-pulse">
-              <Play className="w-5 h-5 fill-white text-white ml-0.5" />
+          {/* ব্যাকগ্রাউন্ড ইমেজ ও ডার্ক ওভারলে */}
+          <div className="absolute inset-0 z-0">
+            <img
+              src="https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&q=80"
+              alt="Food Background"
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/75 to-black/60"></div>
+          </div>
+
+          {/* কন্টেন্ট */}
+          <div className="relative z-10 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-amber-500/90 backdrop-blur-md flex items-center justify-center shadow-inner shrink-0 animate-pulse text-white">
+              <Play className="w-5 h-5 fill-white ml-0.5" />
             </div>
             <div>
-              <span className="text-[9px] font-black uppercase tracking-wider bg-black/25 px-2 py-0.5 rounded-full inline-block">
+              <span className="text-[9px] font-black uppercase tracking-wider bg-amber-400/90 text-slate-950 px-2 py-0.5 rounded-full inline-block mb-0.5">
                 ভিডিও গাইডলাইন
               </span>
-              <h4 className="text-xs font-black mt-0.5 leading-tight">
+              <h4 className="text-xs font-black text-white leading-tight">
                 কীভাবে খাবার অর্ডার ও মিল ক্যানসেল করবেন?
               </h4>
-              <p className="text-[10px] text-amber-100">
-                অর্ডার প্রক্রিয়ার বিস্তারিত ভিডিও টিউটোরিয়াল দেখুন
+              <p className="text-[10px] text-slate-200 mt-0.5">
+                অর্ডার প্রক্রিয়ার বিস্তারিত ভিডিও দেখুন
               </p>
             </div>
           </div>
-          <span className="text-[11px] font-extrabold bg-white text-amber-900 px-3 py-1.5 rounded-xl shadow-sm shrink-0">
+
+          <span className="relative z-10 text-[11px] font-extrabold bg-amber-400 text-slate-950 px-3 py-1.5 rounded-xl shadow-sm shrink-0">
             ভিডিও দেখুন
           </span>
         </div>
@@ -886,35 +886,8 @@ export default function MealOrderApp() {
 
         {/* রেগুলার প্যাকেজ হলে রুটিন ফুড কার্ড শো করবে */}
         {selectedPackage === "REGULAR" ? (
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="relative h-44 w-full">
-              <img
-                src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80"
-                alt="Regular Menu"
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent"></div>
-              <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between">
-                <div>
-                  <span className="text-amber-300 text-[10px] font-bold flex items-center gap-1">
-                    <Star className="w-3 h-3 fill-amber-300 text-amber-300" />{" "}
-                    ৪.৯ সুষম সাইকেল রুটিন
-                  </span>
-                  <h3 className="text-white font-extrabold text-base leading-tight mt-0.5">
-                    রেগুলার ৩-দিনের চক্রভিত্তিক মিল
-                  </h3>
-                </div>
-                <div className="text-right shrink-0">
-                  <span className="text-xl font-black text-amber-300">
-                    ৳৭০-৯০
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="p-3.5 text-xs text-slate-600 leading-relaxed">
-              ১ম দিন ডিম, ২য় দিন মাছ, ৩য় দিন মুরগি + ডাল ও সবজি। শুক্রবারে
-              স্পেশাল বিফ পোলাও!
-            </div>
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden hidden">
+            {/* বড় ফুড কার্ডটি রিমুভ করা হয়েছে */}
           </div>
         ) : (
           /* কাস্টম প্লেট গ্রিড ভিউ */
@@ -1279,14 +1252,35 @@ export default function MealOrderApp() {
                                       {count > 0 && (
                                         <button
                                           type="button"
-                                          onClick={() =>
-                                            updateDateSlotExtra(
-                                              dConfig.date,
-                                              selectedExtraSlot,
-                                              ex.id,
-                                              -1,
-                                            )
-                                          }
+                                          onClick={() => {
+                                            setSelectedDatesMap((prev) => {
+                                              const dayConfig =
+                                                prev[dConfig.date];
+                                              if (!dayConfig) return prev;
+                                              const sExtras =
+                                                dayConfig.extras[
+                                                  selectedExtraSlot
+                                                ] || {};
+                                              const cur = sExtras[ex.id] || 0;
+                                              const nextC = Math.max(
+                                                0,
+                                                cur - 1,
+                                              );
+                                              return {
+                                                ...prev,
+                                                [dConfig.date]: {
+                                                  ...dayConfig,
+                                                  extras: {
+                                                    ...dayConfig.extras,
+                                                    [selectedExtraSlot]: {
+                                                      ...sExtras,
+                                                      [ex.id]: nextC,
+                                                    },
+                                                  },
+                                                },
+                                              };
+                                            });
+                                          }}
                                           className="w-5 h-5 rounded bg-slate-100 border flex items-center justify-center text-slate-600"
                                         >
                                           <Minus className="w-3 h-3" />
@@ -1299,14 +1293,29 @@ export default function MealOrderApp() {
                                       )}
                                       <button
                                         type="button"
-                                        onClick={() =>
-                                          updateDateSlotExtra(
-                                            dConfig.date,
-                                            selectedExtraSlot,
-                                            ex.id,
-                                            1,
-                                          )
-                                        }
+                                        onClick={() => {
+                                          setSelectedDatesMap((prev) => {
+                                            const dayC = prev[dConfig.date];
+                                            if (!dayC) return prev;
+                                            const sExtras =
+                                              dayC.extras[selectedExtraSlot] ||
+                                              {};
+                                            const cur = sExtras[ex.id] || 0;
+                                            return {
+                                              ...prev,
+                                              [dConfig.date]: {
+                                                ...dayC,
+                                                extras: {
+                                                  ...dayC.extras,
+                                                  [selectedExtraSlot]: {
+                                                    ...sExtras,
+                                                    [ex.id]: cur + 1,
+                                                  },
+                                                },
+                                              },
+                                            };
+                                          });
+                                        }}
                                         className="h-5 px-1.5 rounded bg-emerald-600 text-white font-bold text-[10px] flex items-center gap-0.5"
                                       >
                                         <Plus className="w-3 h-3" /> যোগ
@@ -1382,7 +1391,19 @@ export default function MealOrderApp() {
 
           <button
             type="button"
-            onClick={handleProceedToCheckout}
+            onClick={() => {
+              if (selectedDatesList.length === 0 || totalMealSlotsCount === 0) {
+                alert(
+                  "অনুগ্রহ করে অন্তত একটি দিন এবং বেলার খাবার সিলেক্ট করুন!",
+                );
+                return;
+              }
+              if (!isLoggedIn) {
+                setIsLoginModalOpen(true);
+              } else {
+                setIsCheckoutOpen(true);
+              }
+            }}
             className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold py-3 px-5 rounded-2xl shadow-lg flex items-center justify-center gap-2 text-sm"
           >
             <ShoppingBag className="w-4 h-4" />
@@ -1447,6 +1468,179 @@ export default function MealOrderApp() {
         </div>
       )}
 
+      {/* গুগল লগইন মডাল */}
+      {isLoginModalOpen && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-6 space-y-4 shadow-2xl animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b pb-2.5">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                <h3 className="font-extrabold text-slate-800 text-sm">
+                  লগইন বা একাউন্ট তৈরি করুন
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsLoginModalOpen(false)}
+                className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-slate-600 text-center leading-relaxed">
+              খাবার অর্ডার ও মিল ট্র্যাক করতে আপনার গুগল একাউন্ট (Gmail) দিয়ে
+              প্রবেশ করুন।
+            </p>
+            <button
+              type="button"
+              onClick={() => signIn("google")}
+              className="w-full py-3.5 px-4 rounded-2xl border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/30 text-slate-800 font-black text-xs flex items-center justify-center gap-3 shadow-sm transition-all active:scale-95"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path
+                  fill="#4285F4"
+                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.97 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                />
+              </svg>
+              <span>Google (Gmail) দিয়ে এগিয়ে যান</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ওয়ালেট রিচার্জ মডাল */}
+      {isRechargeModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-5 space-y-4 shadow-2xl animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b pb-2.5">
+              <div className="flex items-center gap-2">
+                <Wallet className="w-5 h-5 text-emerald-600" />
+                <div>
+                  <h3 className="font-extrabold text-slate-800 text-sm">
+                    ওয়ালেটে টাকা যোগ করুন
+                  </h3>
+                  <p className="text-[10px] text-slate-500">
+                    বর্তমান ব্যালেন্স: ৳{userWallet}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsRechargeModalOpen(false)}
+                className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRechargeSubmit} className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  টাকার পরিমাণ (নিজের মতো লিখুন):
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">
+                    ৳
+                  </span>
+                  <input
+                    type="number"
+                    min="10"
+                    placeholder="যেমন: ২৫০ বা ১০০০"
+                    value={rechargeAmount}
+                    onChange={(e) => setRechargeAmount(e.target.value)}
+                    required
+                    className="w-full text-sm font-bold pl-7 pr-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  পেমেন্ট মাধ্যম:
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRechargePaymentMethod("BKASH")}
+                    className={`py-2 rounded-xl text-xs font-bold border transition-all ${
+                      rechargePaymentMethod === "BKASH"
+                        ? "border-pink-600 bg-pink-50 text-pink-900 ring-1 ring-pink-500"
+                        : "border-slate-200 text-slate-600"
+                    }`}
+                  >
+                    বিকাশ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRechargePaymentMethod("NAGAD")}
+                    className={`py-2 rounded-xl text-xs font-bold border transition-all ${
+                      rechargePaymentMethod === "NAGAD"
+                        ? "border-orange-600 bg-orange-50 text-orange-900 ring-1 ring-orange-500"
+                        : "border-slate-200 text-slate-600"
+                    }`}
+                  >
+                    নগদ
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs flex items-center justify-between">
+                <span>Send Money নম্বর:</span>
+                <button
+                  type="button"
+                  onClick={copyBkashNumber}
+                  className="font-mono font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded flex items-center gap-1"
+                >
+                  {shopBkashNumber}
+                  {copiedNumber ? (
+                    <Check className="w-3 h-3 text-emerald-600" />
+                  ) : (
+                    <Copy className="w-3 h-3" />
+                  )}
+                </button>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                  ট্রানজেকশন আইডি (TrxID) দিন:
+                </label>
+                <input
+                  type="text"
+                  placeholder="যেমন: BKA98721X"
+                  value={trxId}
+                  onChange={(e) => setTrxId(e.target.value.toUpperCase())}
+                  required
+                  className="w-full text-xs font-mono p-2.5 rounded-xl border border-slate-300 uppercase tracking-widest focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmittingRecharge}
+                className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                {isSubmittingRecharge ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Wallet className="w-4 h-4" />
+                )}
+                <span>টাকা যোগের রিকোয়েস্ট পাঠান (৳{rechargeAmount || 0})</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* চেকআউট মডাল */}
       {isCheckoutOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end justify-center animate-in fade-in">
@@ -1468,7 +1662,6 @@ export default function MealOrderApp() {
               </button>
             </div>
 
-            {/* পেমেন্ট পদ্ধতি */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-700 block">
                 পেমেন্ট মেথড:
@@ -1631,130 +1824,6 @@ export default function MealOrderApp() {
         </div>
       )}
 
-      {/* ওয়ালেট রিচার্জ মডাল */}
-      {isRechargeModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white w-full max-w-sm rounded-3xl p-5 space-y-4 shadow-2xl animate-in zoom-in-95">
-            <div className="flex items-center justify-between border-b pb-2.5">
-              <div className="flex items-center gap-2">
-                <Wallet className="w-5 h-5 text-emerald-600" />
-                <div>
-                  <h3 className="font-extrabold text-slate-800 text-sm">
-                    ওয়ালেটে টাকা যোগ করুন
-                  </h3>
-                  <p className="text-[10px] text-slate-500">
-                    বর্তমান ব্যালেন্স: ৳{userWallet}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsRechargeModalOpen(false)}
-                className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleRechargeSubmit} className="space-y-3">
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  টাকার পরিমাণ (নিজের মতো লিখুন):
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">
-                    ৳
-                  </span>
-                  <input
-                    type="number"
-                    min="10"
-                    placeholder="যেমন: ২৫০ বা ১০০০"
-                    value={rechargeAmount}
-                    onChange={(e) => setRechargeAmount(e.target.value)}
-                    required
-                    className="w-full text-sm font-bold pl-7 pr-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  পেমেন্ট মাধ্যম:
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setRechargePaymentMethod("BKASH")}
-                    className={`py-2 rounded-xl text-xs font-bold border transition-all ${
-                      rechargePaymentMethod === "BKASH"
-                        ? "border-pink-600 bg-pink-50 text-pink-900 ring-1 ring-pink-500"
-                        : "border-slate-200 text-slate-600"
-                    }`}
-                  >
-                    বিকাশ
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRechargePaymentMethod("NAGAD")}
-                    className={`py-2 rounded-xl text-xs font-bold border transition-all ${
-                      rechargePaymentMethod === "NAGAD"
-                        ? "border-orange-600 bg-orange-50 text-orange-900 ring-1 ring-orange-500"
-                        : "border-slate-200 text-slate-600"
-                    }`}
-                  >
-                    নগদ
-                  </button>
-                </div>
-              </div>
-
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs flex items-center justify-between">
-                <span>Send Money নম্বর:</span>
-                <button
-                  type="button"
-                  onClick={copyBkashNumber}
-                  className="font-mono font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded flex items-center gap-1"
-                >
-                  {shopBkashNumber}
-                  {copiedNumber ? (
-                    <Check className="w-3 h-3 text-emerald-600" />
-                  ) : (
-                    <Copy className="w-3 h-3" />
-                  )}
-                </button>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                  ট্রানজেকশন আইডি (TrxID) দিন:
-                </label>
-                <input
-                  type="text"
-                  placeholder="যেমন: BKA98721X"
-                  value={rechargeTrxId}
-                  onChange={(e) =>
-                    setRechargeTrxId(e.target.value.toUpperCase())
-                  }
-                  required
-                  className="w-full text-xs font-mono p-2.5 rounded-xl border border-slate-300 uppercase tracking-widest focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmittingRecharge}
-                className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-2"
-              >
-                {isSubmittingRecharge ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Wallet className="w-4 h-4" />
-                )}
-                <span>টাকা যোগের রিকোয়েস্ট পাঠান (৳{rechargeAmount || 0})</span>
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* ভিডিও টিউটোরিয়াল মডাল */}
       {isVideoModalOpen && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
@@ -1782,6 +1851,62 @@ export default function MealOrderApp() {
                 allowFullScreen
               ></iframe>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ৭ দিনের রুটিন মেনু লিস্ট দেখার পপআপ মডাল */}
+      {isRoutineModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white w-full max-w-md rounded-3xl p-5 space-y-4 max-h-[85vh] overflow-y-auto shadow-2xl animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-base">
+                  ৭ দিনের রুটিন মেনু তালিকা
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  আমাদের সুষম ও পুষ্টিকর সাপ্তাহিক খাবার সাইকেল
+                </p>
+              </div>
+              <button
+                onClick={() => setIsRoutineModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2.5">
+              {fullWeekRoutine.map((routine, idx) => (
+                <div
+                  key={idx}
+                  className="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-1"
+                >
+                  <span className="text-xs font-black text-emerald-800 bg-emerald-100/70 px-2.5 py-0.5 rounded-full inline-block">
+                    {routine.day}
+                  </span>
+                  <div className="text-xs text-slate-700 space-y-0.5 pt-1">
+                    <p>
+                      <strong>☀️ সকাল:</strong> {routine.breakfast}
+                    </p>
+                    <p>
+                      <strong>🍛 দুপুর:</strong> {routine.lunch}
+                    </p>
+                    <p>
+                      <strong>🌙 রাত:</strong> {routine.dinner}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsRoutineModalOpen(false)}
+              className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-2xl text-xs transition-all shadow-md"
+            >
+              বন্ধ করুন
+            </button>
           </div>
         </div>
       )}
