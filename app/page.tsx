@@ -284,10 +284,6 @@ export default function MealOrderApp() {
     },
   ]);
 
-  const [regularMenuOverrides, setRegularMenuOverrides] = useState<{
-    [key: string]: { name: string; price: number };
-  }>({});
-
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"BKASH" | "WALLET">(
     "BKASH",
@@ -300,12 +296,12 @@ export default function MealOrderApp() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [messName, setMessName] = useState("");
   const [roomNo, setRoomNo] = useState("");
-  const [userWallet, setUserWallet] = useState(0);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
 
-  useEffect(() => {
+  // ইউজার ও ওয়ালেট ব্যালেন্স লাইভ ফেচ
+  const fetchUserData = () => {
     if (session?.user?.email) {
       setCustomerName(session.user.name || "");
       fetch(`/api/auth/user?email=${encodeURIComponent(session.user.email)}`)
@@ -322,6 +318,10 @@ export default function MealOrderApp() {
         })
         .catch((err) => console.error(err));
     }
+  };
+
+  useEffect(() => {
+    fetchUserData();
   }, [session]);
 
   useEffect(() => {
@@ -368,19 +368,6 @@ export default function MealOrderApp() {
               })),
             );
           }
-
-          const regOverrides: {
-            [key: string]: { name: string; price: number };
-          } = {};
-          data.forEach((item: any) => {
-            if (item.mealSlot.startsWith("REGULAR_")) {
-              regOverrides[item.mealSlot] = {
-                name: item.nameBn,
-                price: item.price,
-              };
-            }
-          });
-          setRegularMenuOverrides(regOverrides);
         }
       })
       .catch((err) => console.error(err));
@@ -392,38 +379,6 @@ export default function MealOrderApp() {
       : isFreeDeliveryPromo
         ? 0
         : adminDeliveryCharge;
-
-  const cycleIndex =
-    Math.abs(Math.floor(new Date().getTime() / (1000 * 60 * 60 * 24))) % 3;
-
-  const lunchCycle = [
-    {
-      title:
-        regularMenuOverrides["REGULAR_LUNCH_DAY1"]?.name ||
-        "১ম দিন: ডিম ভুনা + ঘন ডাল + আলু ভর্তা + ভাত",
-      price: regularMenuOverrides["REGULAR_LUNCH_DAY1"]?.price || 70,
-      img: "https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=600&q=80",
-      desc: "গরম ধোঁয়া ওঠা বাসমতি চালের ভাত ও ডিম ভুনা।",
-    },
-    {
-      title:
-        regularMenuOverrides["REGULAR_LUNCH_DAY2"]?.name ||
-        "২য় দিন: রুই মাছের ঝোল + সবজি + ডাল + ভাত",
-      price: regularMenuOverrides["REGULAR_LUNCH_DAY2"]?.price || 80,
-      img: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80",
-      desc: "তাজা বড় রুই মাছের জিরা বাটা ঝোল।",
-    },
-    {
-      title:
-        regularMenuOverrides["REGULAR_LUNCH_DAY3"]?.name ||
-        "৩য় দিন: দেশি মুরগির ঝোল + সবজি + ডাল + ভাত",
-      price: regularMenuOverrides["REGULAR_LUNCH_DAY3"]?.price || 90,
-      img: "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=600&q=80",
-      desc: "দেশি মুরগির মাংসের তরকারি ও ঘন ডাল।",
-    },
-  ];
-
-  const currentRegularMenu = lunchCycle[cycleIndex];
 
   const fullWeekRoutine = [
     {
@@ -603,6 +558,7 @@ export default function MealOrderApp() {
     setTimeout(() => setCopiedNumber(false), 2000);
   };
 
+  // ওয়ালেট রিচার্জ রিকোয়েস্ট সাবমিট (সঠিক API ও সেশন হ্যান্ডেলিং)
   const handleRechargeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!session?.user?.email) {
@@ -630,7 +586,7 @@ export default function MealOrderApp() {
         body: JSON.stringify({
           email: session.user.email,
           customerName: customerName || session.user.name,
-          customerPhone: customerPhone,
+          customerPhone: customerPhone || "N/A",
           amount: rechargeAmount,
           paymentMethod: rechargePaymentMethod,
           trxId: rechargeTrxId,
@@ -639,7 +595,7 @@ export default function MealOrderApp() {
 
       if (res.ok) {
         alert(
-          "আলহামদুলিল্লাহ! আপনার রিচার্জ রিকোয়েস্ট এডমিনের কাছে পাঠানো হয়েছে।",
+          "আলহামদুলিল্লাহ! আপনার রিচার্জ রিকোয়েস্ট এডমিনের কাছে পাঠানো হয়েছে। এডমিন অনুমোদন করলেই ওয়ালেটে টাকা যোগ হবে।",
         );
         setIsRechargeModalOpen(false);
         setRechargeTrxId("");
@@ -762,12 +718,7 @@ export default function MealOrderApp() {
       setOrderSuccess(true);
       setIsCheckoutOpen(false);
       setTrxId("");
-
-      if (session?.user?.email) {
-        fetch(`/api/auth/user?email=${encodeURIComponent(session.user.email)}`)
-          .then((r) => r.json())
-          .then((u) => u && setUserWallet(u.walletBalance || 0));
-      }
+      fetchUserData(); // ওয়ালেট ব্যালেন্স রিফ্রেশ
     } catch (err) {
       alert("সার্ভারে সমস্যা হয়েছে।");
     } finally {
@@ -938,8 +889,8 @@ export default function MealOrderApp() {
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="relative h-44 w-full">
               <img
-                src={currentRegularMenu.img}
-                alt={currentRegularMenu.title}
+                src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80"
+                alt="Regular Menu"
                 className="w-full h-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent"></div>
@@ -950,18 +901,19 @@ export default function MealOrderApp() {
                     ৪.৯ সুষম সাইকেল রুটিন
                   </span>
                   <h3 className="text-white font-extrabold text-base leading-tight mt-0.5">
-                    {currentRegularMenu.title}
+                    রেগুলার ৩-দিনের চক্রভিত্তিক মিল
                   </h3>
                 </div>
                 <div className="text-right shrink-0">
                   <span className="text-xl font-black text-amber-300">
-                    ৳{currentRegularMenu.price}
+                    ৳৭০-৯০
                   </span>
                 </div>
               </div>
             </div>
             <div className="p-3.5 text-xs text-slate-600 leading-relaxed">
-              {currentRegularMenu.desc}
+              ১ম দিন ডিম, ২য় দিন মাছ, ৩য় দিন মুরগি + ডাল ও সবজি। শুক্রবারে
+              স্পেশাল বিফ পোলাও!
             </div>
           </div>
         ) : (
@@ -1673,6 +1625,130 @@ export default function MealOrderApp() {
                   <ShoppingBag className="w-4 h-4" />
                 )}
                 <span>কনফার্ম প্রি-অর্ডার (৳{grandTotal})</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ওয়ালেট রিচার্জ মডাল */}
+      {isRechargeModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-5 space-y-4 shadow-2xl animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b pb-2.5">
+              <div className="flex items-center gap-2">
+                <Wallet className="w-5 h-5 text-emerald-600" />
+                <div>
+                  <h3 className="font-extrabold text-slate-800 text-sm">
+                    ওয়ালেটে টাকা যোগ করুন
+                  </h3>
+                  <p className="text-[10px] text-slate-500">
+                    বর্তমান ব্যালেন্স: ৳{userWallet}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsRechargeModalOpen(false)}
+                className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRechargeSubmit} className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  টাকার পরিমাণ (নিজের মতো লিখুন):
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">
+                    ৳
+                  </span>
+                  <input
+                    type="number"
+                    min="10"
+                    placeholder="যেমন: ২৫০ বা ১০০০"
+                    value={rechargeAmount}
+                    onChange={(e) => setRechargeAmount(e.target.value)}
+                    required
+                    className="w-full text-sm font-bold pl-7 pr-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  পেমেন্ট মাধ্যম:
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRechargePaymentMethod("BKASH")}
+                    className={`py-2 rounded-xl text-xs font-bold border transition-all ${
+                      rechargePaymentMethod === "BKASH"
+                        ? "border-pink-600 bg-pink-50 text-pink-900 ring-1 ring-pink-500"
+                        : "border-slate-200 text-slate-600"
+                    }`}
+                  >
+                    বিকাশ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRechargePaymentMethod("NAGAD")}
+                    className={`py-2 rounded-xl text-xs font-bold border transition-all ${
+                      rechargePaymentMethod === "NAGAD"
+                        ? "border-orange-600 bg-orange-50 text-orange-900 ring-1 ring-orange-500"
+                        : "border-slate-200 text-slate-600"
+                    }`}
+                  >
+                    নগদ
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs flex items-center justify-between">
+                <span>Send Money নম্বর:</span>
+                <button
+                  type="button"
+                  onClick={copyBkashNumber}
+                  className="font-mono font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded flex items-center gap-1"
+                >
+                  {shopBkashNumber}
+                  {copiedNumber ? (
+                    <Check className="w-3 h-3 text-emerald-600" />
+                  ) : (
+                    <Copy className="w-3 h-3" />
+                  )}
+                </button>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                  ট্রানজেকশন আইডি (TrxID) দিন:
+                </label>
+                <input
+                  type="text"
+                  placeholder="যেমন: BKA98721X"
+                  value={rechargeTrxId}
+                  onChange={(e) =>
+                    setRechargeTrxId(e.target.value.toUpperCase())
+                  }
+                  required
+                  className="w-full text-xs font-mono p-2.5 rounded-xl border border-slate-300 uppercase tracking-widest focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmittingRecharge}
+                className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                {isSubmittingRecharge ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Wallet className="w-4 h-4" />
+                )}
+                <span>টাকা যোগের রিকোয়েস্ট পাঠান (৳{rechargeAmount || 0})</span>
               </button>
             </form>
           </div>
