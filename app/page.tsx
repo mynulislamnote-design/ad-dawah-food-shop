@@ -1845,7 +1845,7 @@ export default function MealOrderApp() {
             <div className="relative pt-[56.25%] bg-black">
               <iframe
                 className="absolute inset-0 w-full h-full"
-                src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1"
+                src="https://www.youtube.com/embed/kkA8iHpxlOU"
                 title="টিউটোরিয়াল ভিডিও"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
